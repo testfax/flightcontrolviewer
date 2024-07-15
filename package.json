@@ -39,24 +39,20 @@
   },
   "author": "Medi0cr3",
   "license": "ISC",
-  "dependencies": {
-    "base64-url": "^2.3.3",
-    "chokidar": "^3.5.3",
+  "devDependencies": {
+    "json-colorizer": "^2.2.2",
     "colors": "^1.4.0",
     "dateformat": "^5.0.3",
-    "electron-log": "^5.0.0",
-    "electron-store": "^8.1.0",
-    "electron-updater": "^6.1.4",
+    "electron": "^31.2.1",
+    "electron-builder": "^24.13.3",
+    "electron-log": "^5.1.5",
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.3.0",
     "fs": "^0.0.1-security",
-    "json-colorizer": "^2.2.2",
-    "platform-folders": "^0.6.0",
     "tail": "^2.2.6",
     "uuid": "^9.0.1",
-    "zlib": "^1.0.5"
-  },
-  "devDependencies": {
-    "electron": "^27.0.2",
-    "electron-builder": "^24.6.4"
+    "platform-folders": "^0.6.0"
+
   },
   "electronmon": {
     "patterns": [
