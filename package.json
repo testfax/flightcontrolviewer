@@ -1,18 +1,66 @@
 {
   "name": "flightcontrolviewer",
   "version": "1.0.0",
-  "description": "star citizen joystick keybinds viewer",
-  "main": "index.js",
+  "description": "Star Citizen Flight Control Viewer",
+  "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron .",
+    "dist": "electron-builder -p always"
   },
-  "repository": {
-    "type": "git",
-    "url": "flightcontrolviewer"
+  "repository": "https://github.com/testfax/flightcontrolviewer",
+  "publish": {
+    "provider": "github",
+    "owner": "testfax",
+    "releaseType": "release"
+  },
+  "build": {
+    "appId": "com.testfax.flightcontrolviewer",
+    "productName": "Star Citizen Flight Control Viewer",
+    "asar": false,
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": [
+        "deb",
+        "rpm",
+        "AppImage",
+        "snap",
+        "portable"
+      ]
+    },
+    "files": [
+      "**/*",
+      "!**/.vscode/**",
+      "!**/.gitignore/**",
+      "!**/searchtxt/**"
+    ]
   },
   "author": "Medi0cr3",
   "license": "ISC",
+  "dependencies": {
+    "base64-url": "^2.3.3",
+    "chokidar": "^3.5.3",
+    "colors": "^1.4.0",
+    "dateformat": "^5.0.3",
+    "electron-log": "^5.0.0",
+    "electron-store": "^8.1.0",
+    "electron-updater": "^6.1.4",
+    "fs": "^0.0.1-security",
+    "json-colorizer": "^2.2.2",
+    "platform-folders": "^0.6.0",
+    "tail": "^2.2.6",
+    "uuid": "^9.0.1",
+    "zlib": "^1.0.5"
+  },
   "devDependencies": {
-    "electron": "^31.2.0"
+    "electron": "^27.0.2",
+    "electron-builder": "^24.6.4"
+  },
+  "electronmon": {
+    "patterns": [
+      "!./events/Appendix/*.json"
+    ]
   }
 }

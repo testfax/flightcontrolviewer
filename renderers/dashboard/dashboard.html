@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self'">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../../public/stylesheets/index.css">
+    <link rel="stylesheet" href="../../public/stylesheets/w3-colors-vidid.css">
+    <link rel="stylesheet" href="../../public/stylesheets/w3-colors-food.css">
+    <link rel="stylesheet" href="../../public/stylesheets/w3.css">
+    <link href="https://fonts.googleapis.com/css2?family=Allerta+Stencil&family=Trade+Winds&display=swap"
+    rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Abel&family=Castoro+Titling&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <title>Elite Pilots Lounge</title>
+     
+    
+</head>
+<body>
+    <div class="w3-container">
+        <div class="w3-row w3-center">
+            <div class="w3-border w3-round w3-col pointer w3-text-orange">
+                <span class="font-BLOCKY w3-xlarge">MATERIALS</span>
+            </div>
+        </div>
+        <br>
+        <div class='w3-row w3-border w3-round w3-xlarge w3-dark-gray' >
+            
+            <div id="matComp" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' matComp>
+                <i id='matComp_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                Synthesis Components
+            </div>
+            <div id="matComp_container" class="w3-row-padding w3-hide">
+                <div class="w3-col s12 m6 l6 w3-section" >
+                    <div id="matComps" class='w3-center w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' matComps>
+                        <i id='matComps_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                        Synthesis Items Quick Reference
+                    </div>
+                    <div id="matComps_container" class="w3-margin-left">
+                        <div class="w3-border w3-round-large w3-black">
+                            <table class="w3-table w3-bordered w3-medium">
+                                <tbody id="histbar_container2">
+                                    <tr>
+                                        <th class="w3-text-orange font-BLOCKY">Name</th>
+                                        <th class="w3-text-orange font-BLOCKY">Basic</th>
+                                        <th class="w3-text-orange font-BLOCKY">Standard</th>
+                                        <th class="w3-text-orange font-BLOCKY">Premium</th>
+                                        <th class="w3-text-orange font-BLOCKY">All Material</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="w3-text-orange font-BLOCKY">Name</th>
+                                        <th class="w3-text-orange font-BLOCKY">Basic</th>
+                                        <th class="w3-text-orange font-BLOCKY">Standard</th>
+                                        <th class="w3-text-orange font-BLOCKY">Premium</th>
+                                        <th class="w3-text-orange font-BLOCKY">All Material</th>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="w3-col s12 m6 l6 w3-section" >
+                    <div id="compbar" class='w3-center w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' compbar>
+                        <i id='compbar_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                        Synthesis Items
+                    </div>
+                    <div id="compbar_container" class="w3-margin-left">
+                        <div class="w3-border w3-round-large w3-black">
+                            <table class="w3-table w3-bordered w3-medium">
+                                <tbody id="compbarTable_container">
+                                    <tr>
+                                        <th class="w3-text-orange font-BLOCKY">QRM</th>
+                                        <th class="w3-text-orange font-BLOCKY">Name</th>
+                                        <th class="w3-text-orange font-BLOCKY">Basic</th>
+                                        <th class="w3-text-orange font-BLOCKY">Standard</th>
+                                        <th class="w3-text-orange font-BLOCKY">Premium</th>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <br>
+        <div class='w3-row w3-border w3-round w3-xlarge w3-dark-gray' >
+            
+            <div id="History" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' History>
+                <i id='History_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                History Timeline
+            </div>
+            <div id="History_container" class="w3-row-padding">
+                <div class="w3-col s12 m6 l6 w3-section" >
+                    <div id="matHistory" class='w3-center w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' matHistory>
+                        <i id='matHistory_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                        Material Flow History
+                    </div>
+                    <div id="matHistory_container" class="w3-margin-left">
+                        <div class="w3-border w3-round-large w3-black">
+                            <table class="w3-table w3-bordered w3-medium">
+                                <tbody id="histbar_container" >
+                                <tr>
+                                    <th class="w3-text-orange font-BLOCKY">TIMESTAMP</th>
+                                    <th class="w3-text-orange font-BLOCKY">MATERIAL</th>
+                                    <th class="w3-text-orange font-BLOCKY">&nbsp;&nbsp;&nbsp;&nbsp;COUNT</th>
+                                    <th class="w3-text-orange font-BLOCKY">%</th>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="w3-col s12 m6 l6 w3-section" >
+                    <div id="synthHistory" class='w3-center w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY ' synthHistory>
+                        <i id='synthHistory_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                        Synthesis History
+                    </div>
+                    <div id="synthHistory_container" class="w3-margin-left">
+                        <div class="w3-border w3-round-large w3-black">
+                            <table class="w3-table w3-bordered w3-medium">
+                                <tbody id="synthbar_container">
+                                    <!-- <tr> -->
+                                        <!-- <th colspan='2' class="w3-medium w3-text-orange font-BLOCKY">TIMESTAMP</th> -->
+                                        <!-- <th class="w3-medium w3-text-orange font-BLOCKY">SYNTHESIS</th> -->
+                                        <!-- <th class="w3-medium w3-text-orange font-BLOCKY">&nbsp;&nbsp;&nbsp;&nbsp;COUNT</th> -->
+                                    <!-- </tr> -->
+                                    <tr>
+                                        <th colspan="2" id='timeStamp_synth' class="font-BLOCKY w3-text-orange"></th>
+                                        <th id="synthName" class="font-BLOCKY-green"></th>
+                                        <th class="font-BLOCKY">
+                                            <img id='synthType' class='synthPics' src=""></img>
+                                        </th>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="w3-col s12 m6 l6 w3-section" >
+                    <div id="commonMat" class='w3-center w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY ' commonMat>
+                        <i id='commonMat_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                        Quick Reference Materials
+                    </div>
+                    <div id="commonMat_container" class="w3-margin-left">
+                        <div class="w3-border w3-round-large w3-black">
+                            <table class="w3-table w3-bordered w3-medium">
+                                <tbody id="commonMatBar_container" >
+                                <tr>
+                                    <!-- <th class="w3-text-orange font-BLOCKY">TIMESTAMP</th> -->
+                                    <th class="w3-text-orange font-BLOCKY">MATERIAL</th>
+                                    <th class="w3-text-orange font-BLOCKY">&nbsp;&nbsp;&nbsp;&nbsp;COUNT</th>
+                                    <th class="w3-text-orange font-BLOCKY">%</th>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <br>
+        <div class='w3-row w3-border w3-round w3-xlarge w3-dark-gray' >
+            <div id="Materials" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' Materials>
+                <i id='Materials_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                Engineering Materials
+            </div>
+            <div id="Materials_container" class="">
+                <div class="w3-center w3-black  w3-round w3-border">
+                    <span class="w3-medium font-BLOCKY w3-text-orange"><i id="expandall" class="w3-medium pointerRadio w3-vivid-green1 material-icons" expandall>radio_button_unchecked</i>&nbsp;EXPAND ALL</span>
+                    <span class="w3-medium font-BLOCKY w3-text-orange"><i id="collapseall" class="w3-medium pointerRadio w3-vivid-green1 material-icons" collapseall>radio_button_unchecked</i>&nbsp;COLLAPSE ALL</span>
+                </div>
+                <div class="w3-col ">
+                    <div class="w3-col s12 m8 l6 " >
+                        <div id="SpaceMatList" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' SpaceMatList>
+                            <!-- <span>&nbsp;&nbsp;&nbsp;</span> -->
+                            <i id='SpaceMatList_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                            Space Material List
+                        </div>
+                        <div id="SpaceMatList_container" class="w3-margin-bottom w3-row expansion">
+                        
+                    </div>
+                    <div id="GroundMatList" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' GroundMatList>
+                        <!-- <span>&nbsp;&nbsp;&nbsp;</span> -->
+                        <i id='GroundMatList_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                        Ground Material List
+                    </div>
+                    <div id="GroundMatList_container" class="w3-margin-bottom w3-row expansion"></div>
+
+                </div>
+                <div class="w3-col s0 m4 l6 " >
+                    <div id="descriptions" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' descriptions>
+                        <i id='descriptions_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                        Descriptions
+                    </div>
+                    <div id="descriptions_container" class="w3-row">
+                        <div class="w3-border w3-round-large w3-black">
+                            <span id="descriptionText" class="w3-vivid-yellowfg2 w3-small" >
+                            Click on any material name to display material description.
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+<script src="../utilities/classSave.js" defer></script>
+<script src="../utilities/functions.js" defer></script>
+<script src="materials.js" defer></script>
+
+
+
+</body>
+</html>
+
+<!-- block -->
+                <!-- <div class='w3-row w3-border w3-round w3-xlarge w3-dark-gray' >
+                    <div id="manufacturedList" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' manufacturedList>
+                        &nbsp;&nbsp;&nbsp;<i id='manufacturedList_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                        Manufactured
+                    </div>
+                    <div id="manufacturedList_container" class="w3-row">
+                        <div class="w3-col s12 m6 l6" >
+                            <div id="alloy-cat" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' alloy-cat>
+                                <i id='alloy-cat_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Alloys
+                            </div>
+                            <div id="alloy-cat_container" class="w3-row">
+                                <div class="w3-border w3-round-large w3-black pointer">
+                                    <span class="w3-vivid-yellowfg2  font-BLOCKY" >&nbsp;<img class='gradePics' src="../../public/images/grade1.png"></img></span>
+                                    <span class="w3-vivid-green1  font-BLOCKY" >250</span>
+                                    <span class="w3-vivid-yellowfg2  font-BLOCKY" >SALVAGED ALLOYS</span>
+                                </div>
+                                <div class="w3-border w3-round-large w3-black pointer">
+                                    <span class="w3-vivid-yellowfg2  font-BLOCKY" >&nbsp;<img class='gradePics' src="../../public/images/grade2.png"></img></span>
+                                    <span class="w3-vivid-green1  font-BLOCKY" >250</span>
+                                    <span class="w3-vivid-yellowfg2  font-BLOCKY" >GALVANIZING ALLOYS</span>
+                                </div>
+                                <div class="w3-border w3-round-large w3-black pointer">
+                                    <span id="" class="w3-vivid-yellowfg2  font-BLOCKY" >&nbsp;<img class='gradePics' src="../../public/images/grade3.png"></img></span>
+                                    <span id="" class="w3-vivid-green1  font-BLOCKY" >250</span>
+                                    <span id="" class="w3-vivid-yellowfg2  font-BLOCKY" >PHASE ALLOYS</span>
+                                </div>
+                                <div class="w3-border w3-round-large w3-black pointer">
+                                    <span id="" class="w3-vivid-yellowfg2  font-BLOCKY" >&nbsp;<img class='gradePics' src="../../public/images/grade4.png"></img></span>
+                                    <span id="" class="w3-vivid-green1  font-BLOCKY" >250</span>
+                                    <span id="" class="w3-vivid-yellowfg2  font-BLOCKY" >PROTO LIGHT ALLOYS</span>
+                                </div>
+                                <div class="w3-border w3-round-large w3-black pointer">
+                                    <span id="" class="w3-vivid-yellowfg2  font-BLOCKY" >&nbsp;<img class='gradePics' src="../../public/images/grade5.png"></img></span>
+                                    <span id="" class="w3-vivid-green1 font-BLOCKY" >250</span>
+                                    <span id="" class="w3-vivid-yellowfg2  font-BLOCKY" >PROTO RADIOLIC ALLOYS</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="w3-col s0 m6 l6" >
+                            <div id="descriptions" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' descriptions>
+                                <i id='descriptions_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                                Descriptions
+                            </div>
+                            <div id="descriptions_container" class="w3-row">
+                                <div class="w3-border w3-round-large w3-black">
+                                    <span id="" class="w3-vivid-yellowfg2 w3-small" >
+                                        Collected from mining asteroids. Boron is used in ship interior structures, insulation, and in the creation of polymers and ceramics used in station and ship construction. Boron is also used in the manufacture of glass for ships and stations. offering greater strength and thermal shock resistance than other manufacturing techniques. Other uses include agricultural medicine, insecticides, and some advanced medicines.",
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div> -->
+<!-- block -->

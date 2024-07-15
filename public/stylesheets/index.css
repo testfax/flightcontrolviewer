@@ -1,0 +1,207 @@
+body {
+    background-image: url('../images/graybackground.png');
+    background-repeat: repeat;
+}
+
+.percent_square-background {
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(45deg, #c0bdbd4d 0%, rgb(255, 111, 111) 100%);
+  position: relative;
+  border-radius: 5px;
+  text-shadow: 1px 1px 1px #ffffffb3;
+}
+.circle-background {
+  width: 50px;
+  height: 50px;
+  background: radial-gradient(circle, rgba(192, 189, 189, 0.3) 0%, rgb(226, 201, 201) 100%);
+  border-radius: 50%;
+  position: relative;
+}
+.tooltip {
+  display: none;
+  position: absolute;
+  background-color: #333;
+  color: #fff;
+  padding: 5px;
+  border-radius: 5px;
+}
+span.fitwidth {
+  width: 1px;
+  white-space: nowrap;
+}
+th.fitwidth {
+  width: 1px;
+  white-space: nowrap;
+}
+td.fitwidth {
+  width: 1px;
+  white-space: nowrap;
+}
+.text {
+  color: #16a085;
+}
+.imgNameSpan {
+  position: relative;
+  top: 0
+}
+.font-DAFONT {
+  font-family: 'Allerta Stencil', sans-serif;
+}
+.font-DAFONT2 {
+  font-family: 'Trade Winds', cursive;
+}
+.font-BLOCKY2 {
+  font-family: 'Castoro Titling', cursive;
+}
+.font-BLOCKY {
+  font-family: 'Abel', sans-serif;
+}
+.font-BLOCKY-red {
+  color:#ff5757;
+  background-color:#000000;
+  font-family: 'Abel', sans-serif;
+}
+.font-BLOCKY-green {
+  color:#1eff00;
+  background-color:#000000;
+  font-family: 'Abel', sans-serif;
+}
+.material-icons {
+  vertical-align: -10%;
+}
+.rex {
+  vertical-align: 50%;
+}
+.aligned-element {
+  position: relative;
+  top: 7px;
+}
+.aligned-vert-ele {
+  position: relative;
+  top: -8px;
+}
+.aligned-vert-ele2 {
+  position: relative;
+  top: -0px;
+}
+.pointer {cursor: pointer; user-select: none}
+.pointer-help {cursor: help; user-select: none}
+.pointerRadio {cursor: pointer; user-select: none}
+.btnsize { 
+  height:60px; 
+  width:70px;
+}
+.removeLI-Animated {
+  transition: all 0.5s ease-out;
+  opacity: 0;
+}
+.removeEL-Animated {
+  transition: all 0.5s ease-out;
+  opacity: 0;
+}
+.addEL-Animated {
+  transition: all 0.5s ease-in;
+  opacity: 0;
+}
+.gradePics {
+  max-width: 38px; /* Set the maximum width */
+  max-height: 38px; /* Set the maximum height */
+  width: auto; /* Allow the width to adjust proportionally */
+  height: auto; /* Allow the height to adjust proportionally */
+}
+.gradePics2 {
+  max-width: 25px; /* Set the maximum width */
+  max-height: 25px; /* Set the maximum height */
+  width: auto; /* Allow the width to adjust proportionally */
+  height: auto; /* Allow the height to adjust proportionally */
+}
+.gradePics2-mini {
+  max-width: 18px; /* Set the maximum width */
+  max-height: 18px; /* Set the maximum height */
+  width: auto; /* Allow the width to adjust proportionally */
+  height: auto; /* Allow the height to adjust proportionally */
+}
+.checkboxPos {
+  position: relative;
+  top: 5px
+}
+.synthPics {
+  max-width: 25px; /* Set the maximum width */
+  max-height: 25px; /* Set the maximum height */
+  width: auto; /* Allow the width to adjust proportionally */
+  height: auto; /* Allow the height to adjust proportionally */
+}
+.count-right-align {
+  display: inline-block;
+  text-align: right;
+  width: 2em;
+}
+.mainbarcontainer{
+  width: 0px;
+  height: 0px;
+  overflow: hidden;
+  position: relative;
+  /* margin:50px auto; */
+}
+
+.barcontainer{
+  background-color: #ff0000;
+  position: relative;
+  transform: translateY(-50%);
+  top: 42%;
+  /* margin-left: 50px; */
+  width: 7px;
+  height: 15px;
+  /* float: left; */
+  /* //border darken(#98AFC7, 40%) 3px solid */
+}
+
+  
+.bar{
+  /* background-color: #9BC9C7; */
+  /* color:#1eff00; */
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 80%;
+  /* //border-top: 6px solid #FFF; */
+  box-sizing: border-box;
+  animation: grow-y 2.5s ease-out forwards;
+  transform-origin: bottom;
+}
+@keyframes grow-y {
+  from{
+    transform: scaleY(0);
+  }
+}
+.progress-container {
+  display: inline-block;
+  position: relative;
+  background-color: #000000;
+  position: relative;
+  transform: translateX(-50%);
+  border-radius: 5px; /* Add this for rounded edges */
+  width: 40px
+}
+
+.progress-bar {
+  /* background-color: linear-gradient(45deg, #ffffff, #f0f0f0); */
+  height: 15px;
+  width: 0;
+  display: inline-block;
+  vertical-align: middle; /* Align the progress bar vertically with the text */
+  animation: grow-h 1s ease-out forwards;
+  border-radius: 5px; /* Add this for rounded edges */
+  transform-origin: right;
+  
+}
+
+@keyframes grow-h {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
