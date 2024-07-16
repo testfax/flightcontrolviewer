@@ -175,8 +175,6 @@ function main() {
           
           appStartTime = Date.now()
           // loadBrains()
-          // const watcher = require('./utils/watcher')
-          // watcher.tailFile(watcher.savedGameP)
           Menu.setApplicationMenu(mainMenu);
           createWindow();
           // require('./fromRenderer')
@@ -303,7 +301,7 @@ function main() {
             module.exports = { win, cwd };
         }
         catch(e) {
-            logs("failed to load load window",e)
+            logs_error("failed to load load window",e)
             return;
         }
     }
@@ -315,26 +313,26 @@ function main() {
       return
     })
     process.on('uncaughtException', (error,origin) => {
-      errorHandler(error,origin)
+      logs_error(error,origin)
       //  logs('ReferenceError occurred:'.red, error.stack);
     })
     .on('unhandledRejection', (error, origin) => {
-        errorHandler(error,origin)
+      logs_error(error,origin)
     })
     .on('TypeError', (error,origin) => {
-        errorHandler(error,origin)
+      logs_error(error,origin)
         // logs(error)
     })
     .on('ReferenceError', (error,origin) => {
-      errorHandler(error,origin)
+      logs_error(error,origin)
         // logs(error)
     })
     .on('warning', (warning) => {
-      errorHandler(warning.stack,warning.name)
+      logs_error(warning.stack,warning.name)
       // logs('ReferenceError occurred:'.red, warning.stack);
     })
     .on('ERR_INVALID_ARG_TYPE', (error,origin) => {
-        errorHandler(error,origin)
+      logs_error(error,origin)
         // logs(error)
     })
     

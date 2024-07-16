@@ -20,9 +20,9 @@ const util = {
     },
     cwd: app.isPackaged ? path.join(process.cwd(),'resources','app') : process.cwd(),
     autoUpdater: async () => {
-        const { autoUpdater } = require('electron-updater')
         // Auto Updater
         if (app.isPackaged) { 
+            const { autoUpdater } = require('electron-updater')
             logs("Running Auto-Updater Functions".yellow)
             autoUpdater.logger = require('electron-log')
             autoUpdater.checkForUpdatesAndNotify();

@@ -10,7 +10,6 @@ const links = {
         BrowserWindow.fromId(2).loadURL(`file://${path.join(cwd, 'renderers/dashboard/dashboard.html')}`)
         pageData.currentPage = "Dashboard"
         store.set('currentPage',pageData.currentPage)
-        findActiveSocketKey()
     },
     checkForUpdates: async function() {
         try {
