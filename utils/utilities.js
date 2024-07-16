@@ -2,7 +2,6 @@ const { app, BrowserWindow } = require('electron')
 const {logs,logs_error} = require('./logConfig')
 const Store = require('electron-store');
 const store = new Store({ name: 'electronWindowIds'})
-const thisWindow = store.get('electronWindowIds')
 const path = require('path')
 const fs = require('fs')
 const colors = require('colors')
@@ -79,22 +78,22 @@ const util = {
         //After that is received, lets call the Store function to get the contents of that file.
         //Then, once you receive the result from getting the contents of the lounge-client.json
         //Update the object with what you want and then send it back as instructions, the function expects an object once you send it.
-        let result = electronWindowIds.get("windowPosition")
+        let result = store.get("windowPosition")
         //
-        if (!result[0].hasOwnProperty('clientSize')) { 
+        if (!result.hasOwnProperty('clientSize')) { 
             return {moveTo:[700,100], resizeTo:[366,600]}
         }
         if (init) {
             //If init is truthy, then return the result of the file contents and send back what you need.
-            const moveTo = result[0].clientPosition; const resizeTo = result[0].clientSize;
+            const moveTo = result.clientPosition; const resizeTo = result.clientSize;
             return { moveTo, resizeTo }
         }
         if (result) {
             const moved = win.getPosition();
             const resized = win.getSize();
-            result[0]["clientPosition"] = moved 
-            result[0]["clientSize"] = resized
-            electronWindowIds.set("windowPosition",result)
+            result["clientPosition"] = moved 
+            result["clientSize"] = resized
+            store.set("windowPosition",result)
         }
     },
     norm: function(a,b,ext) {
@@ -218,28 +217,6 @@ const util = {
                 app.quit();
             }
         }
-        
-    },
-    logGenerator: function(errorGenReport) {
-        errorGenReport.user = errorFunc.getCommander()
-        Object.entries(thisWindow).forEach(([key, value])=>{
-            let closureWindow = null;
-            if (typeof value == 'number') { closureWindow = BrowserWindow.fromId(value) }
-            store.set('electronWindowIds.appStatus',"error")
-            if (closureWindow && typeof value == 'number') {
-                logs("[ERROR]".red,`${key} Closed..`.yellow)
-                const addKeys = { [key] : value }
-                const oldKeys = errorGenReport.appWindows;
-                errorGenReport.appWindows = {...oldKeys,...addKeys}
-                // closureWindow.close();
-            }
-        })
-        // delete require.cache[require.resolve('./processDetection.js')];
-        // eliteDangerousWatcher.stopWatching()
-        logs("[LOG GEN]".red,`PRACTICE FOR LOG GENERATOR:`.bgMagenta)
-        errorGenReport = Object.keys(errorGenReport).sort((a,b)=> b - a )
-        // logs(errorGenReport)
-        
         
     }
 }

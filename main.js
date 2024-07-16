@@ -1,20 +1,15 @@
 const {logs,logs_error} = require('./utils/logConfig')
-const { errorHandler } = require('./utils/utilities')
-// require('./systems')
-// updatePreviousMaxLines([1,2])
 
-// if (logs) { main(); }
+if (logs) { main(); }
 function main() {
   try {
     const { dialog, nativeTheme, webContents, app, BrowserWindow, ipcMain, Menu } = require('electron')
     const Store = require('electron-store');
     const path = require('path')
     const fs = require('fs')
-    
     const colors = require('colors')
-    const { windowPosition, requestCitizen, autoUpdater } = require('./utils/utilities')
     const electronWindowIds = new Store({ name: "electronWindowIds" });
-    electronWindowIds.set('currentPage','test');
+    electronWindowIds.set('currentPage','dashboard');
     electronWindowIds.set('socketServerStatus','Not Connected to Server');
     electronWindowIds.set('appVersion',app.getVersion());
     electronWindowIds.set('mainStayOnTop',false);
@@ -34,6 +29,11 @@ function main() {
         "appStatus": "clean"
       })
     }
+    const { windowPosition, autoUpdater, errorHandler } = require('./utils/utilities')
+
+
+
+
     // setTimeout(() => {
     //   logs("procecss detection script")
     // },2000)
@@ -174,9 +174,9 @@ function main() {
           if (!isNotDev) { loadingScreen.webContents.openDevTools(); }
           
           appStartTime = Date.now()
-          loadBrains()
-          const watcher = require('./utils/watcher')
-          watcher.tailFile(watcher.savedGameP)
+          // loadBrains()
+          // const watcher = require('./utils/watcher')
+          // watcher.tailFile(watcher.savedGameP)
           Menu.setApplicationMenu(mainMenu);
           createWindow();
           // require('./fromRenderer')

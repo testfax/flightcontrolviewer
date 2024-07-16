@@ -1,8 +1,6 @@
-const {pageData} = require('./utils/errorHandlers')
 const {Menu, BrowserWindow, ipcMain} = require('electron')
 const {logs,logs_error} = require('./utils/logConfig')
-const { autoUpdater } = require('./utils/autoUpdate')
-const { cwd } = require('./utils/utilities')
+const { autoUpdater, cwd, errorHandler } = require('./utils/utilities')
 const Store = require('electron-store');
 const store = new Store({ name: 'electronWindowIds'})
 const path = require('path')

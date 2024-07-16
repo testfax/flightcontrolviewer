@@ -73,8 +73,8 @@ try {
     log.transports.file.maxFiles = 3; // Limit the number of log files
     log.transports.remote = (logData) => { 
         const formattedLogData = {
-            commander: theCitizen,
-            journalLog:  path.basename(latestLog()),
+            citizen: theCitizen,
+            gameLog:  path.basename(lastLogs(client_path("LogBackups").rsi_requested,"log","0")[0]),
             timestamp: new Date(),
             level: logData.level,
             message: logData.data,
