@@ -1,9 +1,9 @@
 const {logs,logs_error} = require('./utils/logConfig')
-const { errorHandler} = require('./utils/errorHandlers')
+const { errorHandler } = require('./utils/utilities')
 // require('./systems')
 // updatePreviousMaxLines([1,2])
 
-if (logs) { main(); }
+// if (logs) { main(); }
 function main() {
   try {
     const { dialog, nativeTheme, webContents, app, BrowserWindow, ipcMain, Menu } = require('electron')
@@ -12,14 +12,19 @@ function main() {
     const fs = require('fs')
     
     const colors = require('colors')
-    const { wingData, windowPosition,requestCmdr } = require('./utils/loungeClientStore')
-    const theCommander = requestCmdr().commander
+    const { windowPosition, requestCitizen, autoUpdater } = require('./utils/utilities')
     const electronWindowIds = new Store({ name: "electronWindowIds" });
     electronWindowIds.set('currentPage','test');
     electronWindowIds.set('socketServerStatus','Not Connected to Server');
     electronWindowIds.set('appVersion',app.getVersion());
-    electronWindowIds.set('socketRooms',{})
     electronWindowIds.set('mainStayOnTop',false);
+    if (!electronWindowIds.get("windowPosition")) {
+      const defaultPosition = {
+        clientPosition: [ 363, 50 ], 
+        clientSize: [ 1000, 888 ]
+      }
+      electronWindowIds.set('windowPosition',defaultPosition)
+    }
     if (app.isPackaged) { electronWindowIds.set('specifyDev',0); }
     else { electronWindowIds.set('specifyDev',1) }
     if (!electronWindowIds.get('electronWindowIds')) {
@@ -37,10 +42,10 @@ function main() {
         // Brains Directory: Loop through all files and load them.
         let brainsDirectory = null;
         if (app.isPackaged) {
-            brainsDirectory = path.join(process.cwd(),'resources','app','events-brain')
+            brainsDirectory = path.join(process.cwd(),'resources','app','brain')
         }
         else {
-            brainsDirectory = path.join(process.cwd(),'events-brain')
+            brainsDirectory = path.join(process.cwd(),'brain')
         }
         fs.readdir(brainsDirectory, (err, files) => {
             if (err) {
@@ -70,61 +75,60 @@ function main() {
             });
         });
     }
-    async function autoUpdaterStuff() {
-      // Auto Updater
-      if (app.isPackaged) { 
-        logs("Running Auto-Updater Functions".yellow)
-        autoUpdater.logger = require('electron-log')
-        autoUpdater.checkForUpdatesAndNotify();
+    // async function autoUpdaterStuff() {
+    //   // Auto Updater
+    //   if (app.isPackaged) { 
+    //     logs("Running Auto-Updater Functions".yellow)
+    //     autoUpdater.logger = require('electron-log')
+    //     autoUpdater.checkForUpdatesAndNotify();
 
-        // autoUpdater.logger.transports.file.level = 'info';
-        // autoUpdater.autoDownload = true
-        // autoUpdater.autoInstallOnAppQuit = true
-        autoUpdater.on('download-progress', (progressObj) => {
-          const thisPercent = progressObj.percent / 100
-          const formattedNumber = (thisPercent).toLocaleString(undefined, { style: 'percent', minimumFractionDigits:1});
-          win.setTitle(`${theCommander.commander} | Elite Pilots Lounge - ${JSON.stringify(app.getVersion())} Downloading New Update ${formattedNumber}`)
-        })
-        autoUpdater.on('error',(error)=>{
-        })
-        autoUpdater.on('checking-for-update', (info)=>{
-          // if (!info) { 
-          //   win.setTitle(`Elite Pilots Lounge - ${JSON.stringify(app.getVersion())} Checking for Updates "NONE"`)
-          // }
-          // else {
-          //   win.setTitle(`Elite Pilots Lounge - ${JSON.stringify(app.getVersion())} Checking for Updates ${info}`)
-          // }
-        })
-        autoUpdater.on('update-available',(info)=>{
-          win.setTitle(`${theCommander.commander} | Elite Pilots Lounge - ${JSON.stringify(app.getVersion())} - ${JSON.stringify(info.version)} Update Available, download pending... please wait...`)
-        })
-        autoUpdater.on('update-not-available',(info)=>{
-          // logs(`-AU update-not-available: ${JSON.stringify(info)}`)
-        })
-        autoUpdater.on('update-downloaded',(info)=>{
-          dialog.showMessageBox({
-            type: 'info',
-            title: 'Update Available',
-            message: 'A new version of the app is available. App will now automatically install and restart once completed.',
-            buttons: ['Continue']
-          }).then((result) => {
-            if (result.response === 0) {
-              // User chose to install now, quit the app and install the update.
-              // const appDataFolderPath = path.join(process.env.APPDATA, 'elitepilotslounge');
-              // //Removes the roaming folder for a clean install.
-              // //Have seen users not be able to load the program, due to corrupted roaming/elitepilotslounge.
-              // if (fs.existsSync(appDataFolderPath)) {
-              //   console.log(appDataFolderPath)
-              //   fs.rmdirSync(appDataFolderPath, { recursive: true });
-              // }
-              autoUpdater.quitAndInstall();
-            }
-          });
-        })
-      }
-    }
-    logs("=ELITE PILOTS LOUNGE= START".green,"isPackaged:".yellow,`${JSON.stringify(app.isPackaged,null,2)}`.cyan, "Version:".yellow,`${JSON.stringify(app.getVersion(),null,2)}`.cyan);
-    const { autoUpdater } = require('electron-updater')
+    //     // autoUpdater.logger.transports.file.level = 'info';
+    //     // autoUpdater.autoDownload = true
+    //     // autoUpdater.autoInstallOnAppQuit = true
+    //     autoUpdater.on('download-progress', (progressObj) => {
+    //       const thisPercent = progressObj.percent / 100
+    //       const formattedNumber = (thisPercent).toLocaleString(undefined, { style: 'percent', minimumFractionDigits:1});
+    //       win.setTitle(`${theCommander.commander} | Elite Pilots Lounge - ${JSON.stringify(app.getVersion())} Downloading New Update ${formattedNumber}`)
+    //     })
+    //     autoUpdater.on('error',(error)=>{
+    //     })
+    //     autoUpdater.on('checking-for-update', (info)=>{
+    //       // if (!info) { 
+    //       //   win.setTitle(`Elite Pilots Lounge - ${JSON.stringify(app.getVersion())} Checking for Updates "NONE"`)
+    //       // }
+    //       // else {
+    //       //   win.setTitle(`Elite Pilots Lounge - ${JSON.stringify(app.getVersion())} Checking for Updates ${info}`)
+    //       // }
+    //     })
+    //     autoUpdater.on('update-available',(info)=>{
+    //       win.setTitle(`${theCommander.commander} | Elite Pilots Lounge - ${JSON.stringify(app.getVersion())} - ${JSON.stringify(info.version)} Update Available, download pending... please wait...`)
+    //     })
+    //     autoUpdater.on('update-not-available',(info)=>{
+    //       // logs(`-AU update-not-available: ${JSON.stringify(info)}`)
+    //     })
+    //     autoUpdater.on('update-downloaded',(info)=>{
+    //       dialog.showMessageBox({
+    //         type: 'info',
+    //         title: 'Update Available',
+    //         message: 'A new version of the app is available. App will now automatically install and restart once completed.',
+    //         buttons: ['Continue']
+    //       }).then((result) => {
+    //         if (result.response === 0) {
+    //           // User chose to install now, quit the app and install the update.
+    //           // const appDataFolderPath = path.join(process.env.APPDATA, 'elitepilotslounge');
+    //           // //Removes the roaming folder for a clean install.
+    //           // //Have seen users not be able to load the program, due to corrupted roaming/elitepilotslounge.
+    //           // if (fs.existsSync(appDataFolderPath)) {
+    //           //   console.log(appDataFolderPath)
+    //           //   fs.rmdirSync(appDataFolderPath, { recursive: true });
+    //           // }
+    //           autoUpdater.quitAndInstall();
+    //         }
+    //       });
+    //     })
+    //   }
+    // }
+    logs("=Flight Control Viewer= START".green,"isPackaged:".yellow,`${JSON.stringify(app.isPackaged,null,2)}`.cyan, "Version:".yellow,`${JSON.stringify(app.getVersion(),null,2)}`.cyan);
     const { mainMenu,rightClickMenu } = require('./menumaker')
     nativeTheme.themeSource = 'dark'
     
@@ -171,52 +175,56 @@ function main() {
           
           appStartTime = Date.now()
           loadBrains()
-          require('./fromRenderer')
-          require('./utils/processDetection')
-          let displayMessages = [
-            {launcherWait: 'Please launch Elite: Dangerous',class:'w3-vivid-yellow'},
-            {allEventsInCurrentLogFile: 'Started to read Journal...',class:'font-BLOCKY-green'},
-            {journalInProgress: 'Loading Events...',class:''},
-            {journalCompleted: 'Loading Events... Completed',class:'w3-large font-BLOCKY-green'},
-            {journalPercent:'',class:''}, //DONT CHANGE THIS INDEX
-          ]
-          let percentShown = 0;
-          function giveItemMSG(action) {  return displayMessages.find(item => action in item); }
-          loadingScreen.webContents.send('displayMessage',giveItemMSG('launcherWait'))
-          ipcMain.on('eliteProcess', (receivedData) => {
-            if (receivedData && loadingScreen) { 
-              const {allEventsInCurrentLogFile} = require('./sockets/taskManager')
-              allEventsInCurrentLogFile((callback)=>{
-                if (callback == 'starting-allEventsInCurrentLogFile') { loadingScreen.webContents.send('displayMessage',giveItemMSG('allEventsInCurrentLogFile')) }
-                if (callback.current == 1) { loadingScreen.webContents.send('displayMessage',giveItemMSG('journalInProgress')) }
-                if (callback.percent == '25%' && percentShown == 0) { logs('[EH]'.green,"LatestLogsRead:".yellow, "25%".cyan); percentShown = 1; }
-                if (callback.percent == '50%' && percentShown == 1) { logs('[EH]'.green,"LatestLogsRead:".yellow, "50%".cyan); percentShown = 0; }
-                if (callback.percent == '75%' && percentShown == 0) { logs('[EH]'.green,"LatestLogsRead:".yellow, "75%".cyan); percentShown = 1; }
-                if (callback.percent == '100%' && percentShown == 0) { logs('[EH]'.green,"LatestLogsRead:".yellow, "100%".cyan); percentShown = 1; }
-                if (typeof callback == 'object') {
-                  const data = `Loading Events... ${callback.current} of ${callback.total} ${callback.percent} events`
-                  displayMessages[4].journalPercent = data
-                  loadingScreen.webContents.send("displayMessage", displayMessages[4]);
-                }
-                if (callback == 'journalLoadComplete') {
-                  loadingScreen.webContents.send("displayMessage", giveItemMSG('journalCompleted'));
-                  const watcher = require('./utils/watcher')
-                  watcher.tailFile(watcher.savedGameP)
-                  Menu.setApplicationMenu(mainMenu);
-                  createWindow();
-                }
-              })
-            }
-            // else {
-            //   logs_error('[PD]'.yellow,"GameStatus??".green,"Elite Not Running")
-            // }
-          })
+          const watcher = require('./utils/watcher')
+          watcher.tailFile(watcher.savedGameP)
+          Menu.setApplicationMenu(mainMenu);
+          createWindow();
+          // require('./fromRenderer')
+          // require('./utils/processDetection')
+          // let displayMessages = [
+          //   {launcherWait: 'Please launch Elite: Dangerous',class:'w3-vivid-yellow'},
+          //   {allEventsInCurrentLogFile: 'Started to read Journal...',class:'font-BLOCKY-green'},
+          //   {journalInProgress: 'Loading Events...',class:''},
+          //   {journalCompleted: 'Loading Events... Completed',class:'w3-large font-BLOCKY-green'},
+          //   {journalPercent:'',class:''}, //DONT CHANGE THIS INDEX
+          // ]
+          // let percentShown = 0;
+          // function giveItemMSG(action) {  return displayMessages.find(item => action in item); }
+          // loadingScreen.webContents.send('displayMessage',giveItemMSG('launcherWait'))
+          // ipcMain.on('eliteProcess', (receivedData) => {
+          //   if (receivedData && loadingScreen) { 
+          //     const {allEventsInCurrentLogFile} = require('./sockets/taskManager')
+          //     allEventsInCurrentLogFile((callback)=>{
+          //       if (callback == 'starting-allEventsInCurrentLogFile') { loadingScreen.webContents.send('displayMessage',giveItemMSG('allEventsInCurrentLogFile')) }
+          //       if (callback.current == 1) { loadingScreen.webContents.send('displayMessage',giveItemMSG('journalInProgress')) }
+          //       if (callback.percent == '25%' && percentShown == 0) { logs('[EH]'.green,"LatestLogsRead:".yellow, "25%".cyan); percentShown = 1; }
+          //       if (callback.percent == '50%' && percentShown == 1) { logs('[EH]'.green,"LatestLogsRead:".yellow, "50%".cyan); percentShown = 0; }
+          //       if (callback.percent == '75%' && percentShown == 0) { logs('[EH]'.green,"LatestLogsRead:".yellow, "75%".cyan); percentShown = 1; }
+          //       if (callback.percent == '100%' && percentShown == 0) { logs('[EH]'.green,"LatestLogsRead:".yellow, "100%".cyan); percentShown = 1; }
+          //       if (typeof callback == 'object') {
+          //         const data = `Loading Events... ${callback.current} of ${callback.total} ${callback.percent} events`
+          //         displayMessages[4].journalPercent = data
+          //         loadingScreen.webContents.send("displayMessage", displayMessages[4]);
+          //       }
+          //       if (callback == 'journalLoadComplete') {
+          //         loadingScreen.webContents.send("displayMessage", giveItemMSG('journalCompleted'));
+          //         const watcher = require('./utils/watcher')
+          //         watcher.tailFile(watcher.savedGameP)
+          //         Menu.setApplicationMenu(mainMenu);
+          //         createWindow();
+          //       }
+          //     })
+          //   }
+          //   // else {
+          //   //   logs_error('[PD]'.yellow,"GameStatus??".green,"Elite Not Running")
+          //   // }
+          // })
         })
     }
     const createWindow = () => {
         try {
             win = new BrowserWindow({
-                title: `Elite Pilots Lounge`,
+                title: `Flight Control Viewer`,
                 width: !isNotDev ? 1000 : 500,
                 height: 800,
                 webPreferences: {
@@ -239,12 +247,11 @@ function main() {
             win.webContents.on("context-menu", () => {
                 rightClickMenu.popup(win.webContents);
             })
-            win.loadFile(path.join(__dirname, './renderers/test/test.html'));
+            win.loadFile(path.join(__dirname, './renderers/dashboard/dashboard.html'));
             win.on("ready-to-show", () => {
               // logs("splash",electronWindowIds.get('electronWindowIds'))
-              
-              
-              win.setTitle(`${theCommander.commander} | Elite Pilots Lounge - ${electronWindowIds.get('socketServerStatus')} - ${app.getVersion()}`)
+
+              win.setTitle(`Flight Control Viewer - ${app.getVersion()}`)
               
               const windowPositionz = windowPosition(win,1)
               win.setPosition(windowPositionz.moveTo[0],windowPositionz.moveTo[1])
@@ -264,7 +271,7 @@ function main() {
 
             const handleLoadFinish = () => {
               setTimeout(() => {
-                  autoUpdaterStuff()
+                  autoUpdater()
                 },5000)
              
               if (!isLoadFinished) {
@@ -290,8 +297,7 @@ function main() {
                   // logs("nosplash",electronWindowIds.get('electronWindowIds'))
                 }
               }
-            };
-            
+            }
             const cwd = app.isPackaged ? path.join(process.cwd(),'resources','app') : process.cwd()
             win.webContents.on('did-finish-load',handleLoadFinish)
             module.exports = { win, cwd };
@@ -302,15 +308,8 @@ function main() {
         }
     }
     app.on('window-all-closed', () =>{
-      logs("=ELITE PILOTS LOUNGE= CLOSED".red,"isPackaged:".yellow,`${JSON.stringify(app.isPackaged,null,2)}`.cyan, "Version:".yellow,`${JSON.stringify(app.getVersion(),null,2)}`.cyan);
+      logs("=Flight Control Viewer= CLOSED".red,"isPackaged:".yellow,`${JSON.stringify(app.isPackaged,null,2)}`.cyan, "Version:".yellow,`${JSON.stringify(app.getVersion(),null,2)}`.cyan);
       // watcher.wat.watcher.close()
-      const roomCache = {
-        Inviter: 0,
-        Others: [],
-        Rooms: [],
-        leave: 1
-      }
-      wingData(roomCache,0)
       // logs(`App Quit`.red)
       if (process.platform !== 'darwin') app.quit()
       return

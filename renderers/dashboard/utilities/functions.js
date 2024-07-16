@@ -1,4 +1,4 @@
-ipcRenderer.on('fetcherMatHistory', (data) => { addMaterialHistory(data) })
+// ipcRenderer.on('fetcherMatHistory', (data) => { addMaterialHistory(data) })
 
 
 class Tooltip {

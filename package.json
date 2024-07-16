@@ -51,8 +51,8 @@
     "fs": "^0.0.1-security",
     "tail": "^2.2.6",
     "uuid": "^9.0.1",
-    "platform-folders": "^0.6.0"
-
+    "platform-folders": "^0.6.0",
+    "xml2js": "^0.6.2"
   },
   "electronmon": {
     "patterns": [
