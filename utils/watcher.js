@@ -1,6 +1,6 @@
 //! Watcher Console Display is located in errorHandler.js
 
-const {watcherConsoleDisplay,errorHandler,pageData} = require('./errorHandlers')
+const {watcherConsoleDisplay,errorHandler} = require('./utilities')
 try {
     const { app, ipcMain, BrowserWindow,webContents  } = require('electron');
     const {logs,logs_error} = require('./logConfig')
@@ -9,34 +9,12 @@ try {
     const thisWindow = store.get('electronWindowIds')
     Tail = require('tail').Tail;
     const path = require('path')
-    // require('./processDetection')
     const fs = require('fs')
     const chokidar = require('chokidar') //Monitors File Changes in the Saved Games\ED\ folder.
-    const { initializeEvent } = require('./eventsHandler')
-    let lcs = require('./loungeClientStore')
-    let lcsStuff = lcs.savedGameLocation("lcsStuff watcher.js");
-    let eventsArray = []
     
     if (lcs.requestCmdr() != false && lcs.requestCmdr() != 'undefined') {
-        const savedGamePath = lcsStuff.savedGamePath;
         const wat = {
-            eliteIO: { status: null, event: "gameStatus" },
-            savedGameP: lcsStuff.savedGamePath,
-            norm: function(a,b,ext) {
-                let fixed = path.normalize(`${a}/${b}.${ext}`)
-                return fixed
-            },
-            // eliteProcess: function(processName, callback) { //I dont even know if this is usable anymore. as processDetection.js handles everything.
-            //     isProcessRunning(processName, (err, result) => {
-            //         if (err) {
-            //         console.error(`Error checking if ${processName} is running: ${err}`);
-            //         return callback(err, null);
-            //         }
-            //         //logs(`The ${processName} process is ${result ? "" : "not "}running`);
-                    
-            //         callback(null, result);
-            //     });
-            // },
+            client_path: "",
             ignoreEvent: function(ignoreEventName) {
                 try {
                     let ignoreEventsJSON;
@@ -59,7 +37,7 @@ try {
             },
             tailFile: function(savedGamePath) { //called from wat.eliteProcess() function. Only for *.log files. *.json files are handled at the bottom of this page with watcher.on('change')
                 const currentJournalLog = lcs.latestLog(savedGamePath,"log")
-                continueWatcherBuild(currentJournalLog)
+                //continueWatcherBuild(currentJournalLog)
                 function continueWatcherBuild(currentJournalLog) {
                     if (watcherConsoleDisplay('globalLogs')) { 
                         logs("[TAIL]".green,"Monitoring:".green ,path.parse(currentJournalLog).base)
@@ -162,11 +140,8 @@ try {
             ],
         })
         
-        watcherPath.on('ready', function() { //! Required to know what file to look at once the game loads.
+        watcherPath.on('ready', function() { //! Required to know what file to look at
             watcherPath.on('error',error => { logs(error);})
-            
-            //APP IS LAUNCHED AND THEN CHECKS TO SEE IF IT IS RUNNING.
-            //todo CALL lcs.readLogFile(savedGamePath) to input data into lcs.readLogFileData object Ex: lcs.readLogFileData.commander
             watcherPath.on("add", savedGamePath => {
                 if (wat.eliteIO.status) {
                     //! Look for hte journal ('.log') file that was added. 
@@ -191,10 +166,7 @@ try {
                     }
                 }
             })
-            //todo need to figure out how to create a single function to loop all these through.
-            //todo The STATUS.JSON is a single line entry and is handled on its own.
-            //todo the other json files are multi line and are handled by tail as being read from the beginning, because they are not
-            //todo saved to the disk, they are only saved in memory.
+
             const tailLogOptionsStatus = { separator: /\n/, fromBeginning: true}
             const JSONtailStatus = new Tail(savedGamePath + 'Status' + '.json',tailLogOptionsStatus);
             JSONtailStatus.on("line", function(data) {
@@ -225,10 +197,6 @@ try {
                     });
                  }
             })
-            //! { "timestamp":"2023-03-16T00:07:37Z", "event":"ModuleInfo" } (notice the "event" name (MODULE) NO "S")
-            //! Only writes to the "*.log" file with this, nothing more.
-            //! Re-Wrote the Event to actually take the renamed event. see wat.tailJsonFile(modulesInfoArray,"ModulesInfo")
-            //todo Rewrite all the code below into 1 function.
             const tailLogOptionsModulesInfo = { separator: /(\r\n|\n|\r)/gm, fromBeginning: true, flushAtEOF: true}
             let JSONtailModulesInfo = new Tail(savedGamePath + 'ModulesInfo' + '.json',tailLogOptionsModulesInfo);
             modulesInfoArray = new Array();
@@ -242,124 +210,6 @@ try {
                     }
                 }
             });
-            // cargoArray = new Array();
-            // const tailLogOptionsCargo = { separator: /(\r\n|\n|\r)/gm, fromBeginning: true}
-            // const JSONtailCargo = new Tail(savedGamePath + 'Cargo' + '.json',tailLogOptionsCargo);
-            // JSONtailCargo.on("line", function(data) { 
-            //     if (wat.eliteIO.status && data) { 
-            //         cargoArray = cargoArray + data;
-            //         if (data.includes(" ] }")) {
-            //             const newString = JSON.stringify(cargoArray)
-            //             wat.tailJsonFile(JSON.parse(newString),"Cargo")
-            //             cargoArray = [''];
-            //         }
-            //     }
-            // });
-            shipLockerArray = new Array();
-            const tailLogOptionsShipLocker = { separator: /(\r\n|\n|\r)/gm, fromBeginning: true}
-            const JSONtailShipLocker = new Tail(savedGamePath + 'ShipLocker' + '.json',tailLogOptionsShipLocker);
-            JSONtailShipLocker.on("line", function(data) { 
-                if (wat.eliteIO.status && data) { 
-                    shipLockerArray = shipLockerArray + data;
-                    if (data.includes(" ] }")) {
-                        const newString = JSON.stringify(shipLockerArray)
-                        wat.tailJsonFile(JSON.parse(newString),"ShipLocker")
-                        shipLockerArray = [''];
-                    }
-                }
-            });
-            shipyardArray = new Array();
-            const tailLogOptionsShipyard = { separator: /(\r\n|\n|\r)/gm, fromBeginning: true}
-            const JSONtailShipyard = new Tail(savedGamePath + 'Shipyard' + '.json',tailLogOptionsShipyard);
-            JSONtailShipyard.on("line", function(data) { 
-                if (wat.eliteIO.status && data) { 
-                    shipyardArray = shipyardArray + data;
-                    if (data.includes(" ] }")) {
-                        const newString = JSON.stringify(shipyardArray)
-                        wat.tailJsonFile(JSON.parse(newString),"Shipyard")
-                        shipyardArray = [''];
-                    }
-                }
-            });
-            outfittingArray = new Array();
-            const tailLogOptionsOutfitting = { separator: /(\r\n|\n|\r)/gm, fromBeginning: true}
-            const JSONtailOutfitting = new Tail(savedGamePath + 'Outfitting' + '.json',tailLogOptionsOutfitting);
-            JSONtailOutfitting.on("line", function(data) { 
-                if (wat.eliteIO.status && data) { 
-                    outfittingArray = outfittingArray + data;
-                    if (data.includes(" ] }")) {
-                        const newString = JSON.stringify(outfittingArray)
-                        wat.tailJsonFile(JSON.parse(newString),"Outfitting")
-                        outfittingArray = [''];
-                    }
-                }
-            });
-            // navRouteArray = new Array();
-            // const tailLogOptionsNavRoute = { separator: /(\r\n|\n|\r)/gm, fromBeginning: true}
-            // const JSONtailNavRoute = new Tail(savedGamePath + 'NavRoute' + '.json',tailLogOptionsNavRoute);
-            // JSONtailNavRoute.on("line", function(data) { 
-            //     if (wat.eliteIO.status && data) { 
-            //         navRouteArray = navRouteArray + data;
-            //         if (data.includes(" ] }")) {
-            //             const newString = JSON.stringify(navRouteArray)
-            //             wat.tailJsonFile(JSON.parse(newString),"NavRoute")
-            //             navRouteArray = [''];
-            //         }
-            //     }
-            // });
-            // marketArray = new Array();
-            // const tailLogOptionsMarket = { separator: /(\r\n|\n|\r)/gm, fromBeginning: true}
-            // const JSONtailMarket = new Tail(savedGamePath + 'Market' + '.json',tailLogOptionsMarket);
-            // JSONtailMarket.on("line", function(data) { 
-            //     if (wat.eliteIO.status && data) { 
-            //         marketArray = marketArray + data;
-            //         if (data.includes(" ] }")) {
-            //             const newString = JSON.stringify(marketArray)
-            //             wat.tailJsonFile(JSON.parse(newString),"Market")
-            //             marketArray = [''];
-            //         }
-            //     }
-            // });
-            backPackArray = new Array();
-            const tailLogOptionsBackpack = { separator: /(\r\n|\n|\r)/gm, fromBeginning: true}
-            const JSONtailBackpack = new Tail(savedGamePath + 'Backpack' + '.json',tailLogOptionsBackpack);
-            JSONtailBackpack.on("line", function(data) { 
-                if (wat.eliteIO.status && data) { 
-                    backPackArray = backPackArray + data;
-                    if (data.includes(" ] }")) {
-                        const newString = JSON.stringify(backPackArray)
-                        wat.tailJsonFile(JSON.parse(newString),"Backpack")
-                        backPackArray = [''];
-                    }
-                }
-            });
-            const fcmaterials_path = path.join(savedGamePath,'FCMaterials.json')
-            try {
-                fs.statSync(fcmaterials_path)
-                fcMaterialsArray = new Array();
-                const tailLogOptionsFCMaterials = { separator: /(\r\n|\n|\r)/gm, fromBeginning: true}
-                const JSONtailFCMaterials = new Tail(savedGamePath + 'FCMaterials' + '.json',tailLogOptionsFCMaterials);
-                JSONtailFCMaterials.on("line", function(data) {
-                    if (wat.eliteIO.status && data) { 
-                        fcMaterialsArray = fcMaterialsArray + data;
-                        if (data.includes(" ] }")) {
-                            const newString = JSON.stringify(fcMaterialsArray)
-                            wat.tailJsonFile(JSON.parse(newString),"FCMaterials")
-                            fcMaterialsArray = [''];
-                        }
-                    }
-                });
-            }
-            catch(e) {
-                const contentsToWrite = 
-                    { "timestamp":"2024-02-03T01:43:23Z", 
-                    "event":"FCMaterials", 
-                    "MarketID":3709451776, 
-                    "CarrierName":"[xsf] killer's sabre", 
-                    "CarrierID":"J0T-68X", "Items":[] 
-                }
-                fs.writeFileSync(fcmaterials_path, JSON.stringify(contentsToWrite), { encoding: 'utf8', flag: 'w' })
-            }
         })
         module.exports = wat
     }

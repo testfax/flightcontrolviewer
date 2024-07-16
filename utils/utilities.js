@@ -7,8 +7,56 @@ const path = require('path')
 const fs = require('fs')
 const getPath = require('platform-folders')
 const colors = require('colors')
-// const {savedGameLocation} = require('./loungeClientStore')
-const errorFunc = {
+Tail = require('tail').Tail;
+
+const lcs = {
+    cwd: app.isPackaged ? path.join(process.cwd(),'resources','app') : process.cwd(),
+    windowPosition: function(win,init) {
+        //Since the intent is to get the window Size and Position, lets call the function that validates the path of the lounge-client.json
+        //After that is received, lets call the Store function to get the contents of that file.
+        //Then, once you receive the result from getting the contents of the lounge-client.json
+        //Update the object with what you want and then send it back as instructions, the function expects an object once you send it.
+        let result = lcs.loungeClientStore(lcs.savedGameLocation("window position").loungeClientFile)
+        //
+        if (!result[0].hasOwnProperty('clientSize')) { 
+            return {moveTo:[700,100], resizeTo:[366,600]}
+        }
+        if (init) {
+            //If init is truthy, then return the result of the file contents and send back what you need.
+            const moveTo = result[0].clientPosition; const resizeTo = result[0].clientSize;
+            return { moveTo, resizeTo }
+        }
+        if (result) {
+            const moved = win.getPosition();
+            const resized = win.getSize();
+            const gPath = result[0]["file"];
+            result[0]["clientPosition"] = moved 
+            result[0]["clientSize"] = resized
+            lcs.loungeClientStore(gPath,result)
+        }
+    },
+    norm: function(a,b,ext) {
+        let fixed = path.normalize(`${a}/${b}.${ext}`)
+        return fixed
+    },
+    client_path: function(details) {
+        if (watcherConsoleDisplay('client_path') && details) {
+            logs("[UTIL]".green,"client_path:".blue,details);
+        }
+        let rsi_path = `${getPath.getDataFolders()}/Roberts Space Industries/StarCitizen/LIVE/user/client`
+        rsi_path = path.normalize(rsi_path)
+
+
+        
+        const client_path = {
+            currentCitizen: {},
+            file: rsi_path, 
+            wing: {Inviter: "", Others: [], Rooms:[]}, 
+            commander: "", 
+            clientPosition: [ 363, 50 ], 
+            clientSize: [ 1000, 888 ]
+        }
+    },
     pageData: { currentPage: "" },
     logF: (err) => { return JSON.stringify(err, null, 2) },
     getCommander: function(data) {
@@ -27,55 +75,7 @@ const errorFunc = {
         //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         const eventType = [
-            // "All",
-            // "BrainEvent",
-            // 'BrainCallbacks',
-            // "showNoEventHandler",
-            // "showNoEventHandlerShowArray",
-            // "CarrierJump",
-            // 'Commander',
-            // "CommunityGoal",
-            // "EjectCargo",
-            // "EngineerApply",
-            // "EngineerCraft",
-            // "EngineerContribution",
-            // "EngineerProgress",
-            // "Docked",
-            // "Undocked",
-            // 'Fileheader',
-            // 'Friends',
-            // 'FSDJump',
-            'gameStatus',
-            'globalLogs',
-            // 'globalIPC',
-            "latestLogsRead",
-            // 'LoadGame',
-            // 'Loadout',
-            // "Location",
-            // "MaterialCollected",
-            // "MaterialTrade",
-            // "Missions",
-            // "Market",
-            // "MissionCompleted",
-            // "Materials",
-            // "Music",
-            "requestCmdrLOGS",
-            // "ReceiveText",
-            // "Synthesis",
-            // "savedGameLocationLOGS",
-            // "Scan",
-            // "Shutdown",
-            // "startup-read",
-            // "showBuffer",
-            // "Statistics",
-            // 'Status',
-            // "Synthesis",
-            // 'SupercruiseExit',
-            // 'wingData',
-            // 'WingAdd',
-            // 'WingInvite',
-            // 'WingJoin',
-            // 'WingLeave'
+            "All",
         ] 
         //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -165,4 +165,4 @@ const errorFunc = {
     }
 }
 
-module.exports = errorFunc
+module.exports = lcs

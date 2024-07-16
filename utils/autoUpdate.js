@@ -1,8 +1,6 @@
 const {app} = require('electron')
 const {logs,logs_error} = require('./logConfig')
-const {watcherConsoleDisplay,errorHandler,logF} = require('./errorHandlers')
-const {requestCmdr} = require('./loungeClientStore')
-const theCommander = requestCmdr().commander
+const {watcherConsoleDisplay,errorHandler,logF} = require('./utilities')
 const Store = require('electron-store');
 const store = new Store({ name: 'electronWindowIds'})
 const win = store.get('electronWindowIds')
