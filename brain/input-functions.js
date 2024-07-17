@@ -1,7 +1,7 @@
 try {
-    const {watcherConsoleDisplay,errorHandler,pageData} = require('../utils/errorHandlers')
+    const {watcherConsoleDisplay,pageData} = require('../utils/utilities')
     const { app,ipcMain, BrowserWindow,webContents  } = require('electron');
-    const {logs} = require('../utils/logConfig')
+    const {logs,logs_error} = require('../utils/logConfig')
     const Store = require('electron-store');
     const store = new Store({ name: 'electronWindowIds'})
     const thisWindow = store.get('electronWindowIds')
@@ -10,10 +10,6 @@ try {
     const fs = require('fs')
 
     const utilities = {
-        findActiveSocketKey: function(rooms,titanState) {
-            const entry = Object.entries(rooms).find(([key, value]) => value === true);
-            return entry ? entry[0] : titanState
-        },
         redisValidator: function(redisRequestObject) {
             const directory = {
                 "from": {
@@ -296,5 +292,5 @@ try {
 }
 catch(e) {
     // logs(e)
-    errorHandler(e,e.name)
+    logs_error(e,e.name)
 }

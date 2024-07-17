@@ -174,7 +174,7 @@ function main() {
           if (!isNotDev) { loadingScreen.webContents.openDevTools(); }
           
           appStartTime = Date.now()
-          // loadBrains()
+          loadBrains()
           Menu.setApplicationMenu(mainMenu);
           createWindow();
           // require('./fromRenderer')
