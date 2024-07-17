@@ -9,18 +9,32 @@ try {
     const fs = require('fs')
     const HID = require('node-hid');
     //!Functions!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    function blastToUI(data,review) {
-      review = false
-      // if (data.event == 'FSDJump' || data.event == 'Location') { logs("Review:".yellow,logF(data)) }
+    function blastToUI(data,deviceInfo,receiver) {
       if (windowItemsStore.get('currentPage') == thisBrain) {
-        // if (review && data.event != 'FSDJump' && data.event != 'Location') { logs("Review:".yellow,logF(data.event)) }
         const client = BrowserWindow.fromId(thisWindow.win);
-        if (client) { client.webContents.send("from_brain-detection", data); }
+        const package = {
+          data: data,
+          deviceInfo: deviceInfo
+        }
+        if (client) { client.webContents.send(receiver, package); }
+        else { console.log("no client")}
+      }
+    }
+    function initializeUI(data,deviceInfo,receiver) { 
+      if (windowItemsStore.get('currentPage') == thisBrain) {
+        const client = BrowserWindow.fromId(thisWindow.win);
+        const package = {
+          data: data,
+          deviceInfo: deviceInfo
+        }
+        deviceSetup[deviceInfo]
+        if (client) { client.webContents.send(receiver, package); }
+        else { console.log("no client")}
       }
     }
     //!BRAIN EVENT######################################################
     //!Startup Variables
-    const thisBrain = 'brain-detection'
+    const thisBrain = 'dashboard'
     const store = new Store({ name: `${thisBrain}` })
     // if (!store.get('currentCarrierMarket')) { store.set('currentCarrierMarket',false) }
     let input_devices = {}
@@ -37,40 +51,63 @@ try {
     const deviceList = uniqueDevices.map(i=> ({
       product: i.product,
       productId: i.productId,
-      vendorId: i.vendorId,
-      path: i.path
+      vendorId: i.vendorId
     }))
-    // console.log(deviceList)
+    console.log(deviceList)
     // const joystick = devices.find(device => device.vendorId === 13124 && device.productId === 505);
-    const joystick1 = devices.find(device => device.vendorId === 13124 && device.productId === 33779)
-    const joystick2 = devices.find(device => device.vendorId === 13124 && device.productId === 17396)
-    const joystick3 = devices.find(device => device.vendorId === 13124 && device.productId === 505)
-    
-    
-    if (joystick1) {
-      const device = new HID.HID(joystick1.path);
-      device.on('data', data => {
-        // Process joystick data
-        const buffer = Buffer.from(data)
-       
-        const pedalAxis = buffer.readUInt16LE(1)
-        //console.log("L-STICK: ",pedalAxis);
-        // mainWindow.webContents.send('joystick-data', data);
-      });
-
-      device.on('error', err => {
-        console.error('Joystick error:', err);
-      });
-    } else {
-      console.error('Joystick not found');
+        // const joystick1 = devices.find(device => device.vendorId === 13124 && device.productId === 33779)
+    // const joystick2 = devices.find(device => device.vendorId === 13124 && device.productId === 17396)
+    // const joystick3 = devices.find(device => device.vendorId === 13124 && device.productId === 505)
+    const devicesRequested = {
+      "js1": { 
+        "vendorId": 13124, 
+        "productId": 33779 
+      },
+      "js2": { 
+        "vendorId": 13124, 
+        "productId": 17396 
+      },
+      "js3": { 
+        "vendorId": 13124, 
+        "productId": 505 
+      }
     }
+    const foundDevices = {};
+    for (const [key, { vendorId, productId }] of Object.entries(devicesRequested)) {
+      foundDevices[key] = devices.find(device => device.vendorId === vendorId && device.productId === productId);
+    }
+    const { js1: joystick1, js2: joystick2, js3: joystick3 } = foundDevices;
+    let deviceSetup = {
+      js1: 0,
+      js2: 0,
+      js3: 0
+    }
+    // if (joystick1) {
+    //   const device = new HID.HID(joystick1.path);
+    //   device.on('data', data => {
+    //     // Process joystick data
+    //     const buffer = Buffer.from(data)
+       
+    //     const pedalAxis = buffer.readUInt16LE(1)
+    //     //console.log("L-STICK: ",pedalAxis);
+    //     // mainWindow.webContents.send('joystick-data', data);
+    //   });
+
+    //   device.on('error', err => {
+    //     console.error('Joystick error:', err);
+    //   });
+    // } else {
+    //   console.error('Joystick not found');
+    // }
     if (joystick2) {
       const device = new HID.HID(joystick2.path);
       device.on('data', data => {
-        // Process joystick data
+        // console.log("deviceSetup.js2 = ",deviceSetup.js2)
         const buffer = Buffer.from(data)
-        const pedalAxis = buffer.readUInt16LE(1)
-        // console.log(pedalAxis)
+        if (deviceSetup.js2 == 0) { initializeUI(buffer,"js2","from_brain-detection-initialize"); deviceSetup.js2 = 1 }
+        // const xAxis = buffer.readUInt16LE(1)
+        if (deviceSetup.js2 == 2) { blastToUI(buffer,"js2","from_brain-detection") }
+        // console.log(xAxis)
         // console.log("R-STICK: ",pedalAxis);
         // mainWindow.webContents.send('joystick-data', data);
       });
@@ -81,22 +118,22 @@ try {
     } else {
       console.error('Joystick not found');
     }
-    if (joystick3) {
-      const device = new HID.HID(joystick3.path);
-      device.on('data', data => {
-        // Process joystick data
-        const buffer = Buffer.from(data)
-        const pedalAxis = buffer.readUInt16LE(1)
-        // console.log("PEDALS: ",pedalAxis);
-        // mainWindow.webContents.send('joystick-data', data);
-      });
+    // if (joystick3) {
+    //   const device = new HID.HID(joystick3.path);
+    //   device.on('data', data => {
+    //     // Process joystick data
+    //     const buffer = Buffer.from(data)
+    //     const pedalAxis = buffer.readUInt16LE(1)
+    //     // console.log("PEDALS: ",pedalAxis);
+    //     // mainWindow.webContents.send('joystick-data', data);
+    //   });
       
-      device.on('error', err => {
-        console.error('Joystick error:', err);
-      });
-    } else {
-      console.error('Joystick not found');
-    }
+    //   device.on('error', err => {
+    //     console.error('Joystick error:', err);
+    //   });
+    // } else {
+    //   console.error('Joystick not found');
+    // }
 
 
 

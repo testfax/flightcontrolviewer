@@ -6,7 +6,7 @@
     <meta http-equiv="Content-Security-Policy" content="script-src 'self'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../../public/stylesheets/index.css">
-    <link rel="stylesheet" href="../../public/stylesheets/w3-colors-vidid.css">
+    <link rel="stylesheet" href="../../public/stylesheets/w3-colors-vivid.css">
     <link rel="stylesheet" href="../../public/stylesheets/w3-colors-food.css">
     <link rel="stylesheet" href="../../public/stylesheets/w3.css">
     <link href="https://fonts.googleapis.com/css2?family=Allerta+Stencil&family=Trade+Winds&display=swap"
@@ -15,9 +15,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Abel&family=Castoro+Titling&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-    <title>Elite Pilots Lounge</title>
-     
-    
+    <title>Flight Control Viewer</title>
 </head>
 <body>
     <div class="w3-container">
@@ -28,20 +26,20 @@
         </div>
         <br>
         <div class='w3-row w3-border w3-round w3-xlarge w3-dark-gray' >
-            <div id="buffers" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' joystickBuffer>
+            <div id="buffers" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' jsstickBuffer>
                 <i id='buffers_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
-                Joystick Buffers
+                jsstick Buffers
             </div>
             <div id="buffers_container" class="w3-row-padding">
                 <div class="w3-col s12 m6 l6 w3-section" >
-                    <div id="joy1" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' joy1>
-                        <i id='joy1_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                    <div id="js1" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' js1>
+                        <i id='js1_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
                         Joystick 1
                     </div>
-                    <div id="joy1_container" class="w3-margin-left">
+                    <div id="js1_container" class="w3-margin-left">
                         <div class="w3-border w3-round-large w3-black">
                             <table class="w3-table w3-bordered w3-medium">
-                                <tbody id="joy1bar_container" >
+                                <tbody id="js1bar_container" >
                                 <tr>
                                     <th class="w3-text-orange font-BLOCKY">Assignment</th>
                                     <th class="w3-text-orange font-BLOCKY">Slot</th>
@@ -53,14 +51,14 @@
                     </div>
                 </div>
                 <div class="w3-col s12 m6 l6 w3-section" >
-                    <div id="joy2" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' joy2>
-                        <i id='joy2_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                    <div id="js2" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' js2>
+                        <i id='js2_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
                         Joystick 2
                     </div>
-                    <div id="joy2_container" class="w3-margin-left">
+                    <div id="js2_container" class="w3-margin-left">
                         <div class="w3-border w3-round-large w3-black">
                             <table class="w3-table w3-bordered w3-medium">
-                                <tbody id="joy2bar_container" >
+                                <tbody id="js2bar_container" >
                                 <tr>
                                     <th class="w3-text-orange font-BLOCKY">Assignment</th>
                                     <th class="w3-text-orange font-BLOCKY">Slot</th>
@@ -94,7 +92,7 @@
         </div>
         <br>
     </div>
-<script src="../utilities/functions.js" defer></script>
+<script src="./utilities/functions.js" defer></script>
 <script src="dashboard.js" defer></script>
 
 

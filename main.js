@@ -29,7 +29,7 @@ function main() {
         "appStatus": "clean"
       })
     }
-    const { windowPosition, autoUpdater, errorHandler } = require('./utils/utilities')
+    const { windowPosition, autoUpdater } = require('./utils/utilities')
 
 
 
@@ -234,6 +234,7 @@ function main() {
                 show: false,
                 alwaysOnTop: electronWindowIds.get('mainStayOnTop'),
               })
+
               // const derp = app.isPackaged
               // win.webContents.executeJavaScript(`window.isPackaged = ${derp}`)
               
