@@ -29,29 +29,32 @@ try {
 
     // Your joystick logic here
     let devices = HID.devices()
-    // const uniqueDevices = Array.from(new Map(devices
-    //   .filter(device => device.product !== '') // Remove entries where product is blank
-    //   .map(device => [device.product, device])))
-    //   .map(([key, value]) => value);
+    const uniqueDevices = Array.from(new Map(devices
+      .filter(device => device.product !== '') // Remove entries where product is blank
+      .map(device => [device.product, device])))
+      .map(([key, value]) => value);
   
-    // const deviceList = uniqueDevices.map(i=> ({
-    //   product: i.product,
-    //   productId: i.productId,
-    //   vendorId: i.vendorId,
-    //   path: i.path
-    // }))
+    const deviceList = uniqueDevices.map(i=> ({
+      product: i.product,
+      productId: i.productId,
+      vendorId: i.vendorId,
+      path: i.path
+    }))
     // console.log(deviceList)
-    const joystick = devices.find(device => device.vendorId === 13124 && device.productId === 505);
-
-    if (joystick) {
-      const device = new HID.HID(joystick.path);
-
+    // const joystick = devices.find(device => device.vendorId === 13124 && device.productId === 505);
+    const joystick1 = devices.find(device => device.vendorId === 13124 && device.productId === 33779)
+    const joystick2 = devices.find(device => device.vendorId === 13124 && device.productId === 17396)
+    const joystick3 = devices.find(device => device.vendorId === 13124 && device.productId === 505)
+    
+    
+    if (joystick1) {
+      const device = new HID.HID(joystick1.path);
       device.on('data', data => {
         // Process joystick data
         const buffer = Buffer.from(data)
-        const pedalAxis = buffer.readUInt16LE (1)
-        // const pedalAxis = buffer.readUInt8(1)
-        console.log(pedalAxis);
+       
+        const pedalAxis = buffer.readUInt16LE(1)
+        //console.log("L-STICK: ",pedalAxis);
         // mainWindow.webContents.send('joystick-data', data);
       });
 
@@ -61,6 +64,42 @@ try {
     } else {
       console.error('Joystick not found');
     }
+    if (joystick2) {
+      const device = new HID.HID(joystick2.path);
+      device.on('data', data => {
+        // Process joystick data
+        const buffer = Buffer.from(data)
+        const pedalAxis = buffer.readUInt16LE(1)
+        // console.log(pedalAxis)
+        // console.log("R-STICK: ",pedalAxis);
+        // mainWindow.webContents.send('joystick-data', data);
+      });
+
+      device.on('error', err => {
+        console.error('Joystick error:', err);
+      });
+    } else {
+      console.error('Joystick not found');
+    }
+    if (joystick3) {
+      const device = new HID.HID(joystick3.path);
+      device.on('data', data => {
+        // Process joystick data
+        const buffer = Buffer.from(data)
+        const pedalAxis = buffer.readUInt16LE(1)
+        // console.log("PEDALS: ",pedalAxis);
+        // mainWindow.webContents.send('joystick-data', data);
+      });
+      
+      device.on('error', err => {
+        console.error('Joystick error:', err);
+      });
+    } else {
+      console.error('Joystick not found');
+    }
+
+
+
 
     ipcMain.on(thisBrain, async (receivedData) => {
       // logs(`${receivedData.event}`.cyan)
