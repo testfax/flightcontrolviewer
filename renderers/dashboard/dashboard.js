@@ -138,8 +138,10 @@ function findMatObject(obj, key, value, parentKey = null) {
 
 ipcRenderer.on('from_brain-detection', (package) => {
   console.log("initialized-device:",package.deviceInfo.position,package.data.detection)
-
-  document.getElementById(`${package.deviceInfo.position}_${package.data.ind}_assignment`).innerText = package.data.detection
+  const changeButton = document.getElementById(`${package.deviceInfo.position}_${package.data.ind}_assignment`)
+  changeButton.innerText = package.data.detection
+  const allColors = 
+  changeButton.classList.add('.font-BLOCKY-green .currentButton')
 })
 ipcRenderer.on('from_brain-detection-initialize', (package) => {
   console.log("device-input:",package.deviceInfo.position)
