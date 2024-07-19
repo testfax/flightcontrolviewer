@@ -137,13 +137,12 @@ function findMatObject(obj, key, value, parentKey = null) {
 }
 
 ipcRenderer.on('from_brain-detection', (package) => {
-  console.log("device:",package.deviceInfo.position,package.data.detection)
-  console.log("data:",package.data)
+  console.log("initialized-device:",package.deviceInfo.position,package.data.detection)
+
   document.getElementById(`${package.deviceInfo.position}_${package.data.ind}_assignment`).innerText = package.data.detection
 })
 ipcRenderer.on('from_brain-detection-initialize', (package) => {
-  console.log("device:",package.deviceInfo.position)
-  console.log("device:",package.data)
+  console.log("device-input:",package.deviceInfo.position)
   document.getElementById(`${package.deviceInfo.position}_position`).innerText = package.deviceInfo.product
   const container = document.getElementById(`${package.deviceInfo.position}bar_container`)
   let dynamicDom = document.getElementsByClassName(`${package.deviceInfo.position}_DynamicDom`)
@@ -152,7 +151,6 @@ ipcRenderer.on('from_brain-detection-initialize', (package) => {
 
   
   try {
-    
     Object.keys(package.data).forEach((slot,index) => {
       const newTR = document.createElement('tr')
       container.appendChild(newTR)
