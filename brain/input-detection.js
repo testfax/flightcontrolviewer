@@ -1,27 +1,18 @@
 const { logs, logs_error } = require('../utils/logConfig')
 try {
   const throttle = require('lodash.throttle');
-  const {logF,pageData} = require('../utils/utilities')
+  const { pageData } = require('../utils/utilities')
+  const { blastToUI } = require('../brain/input-functions')
   const { app, ipcMain, BrowserWindow, webContents  } = require('electron');
   const Store = require('electron-store');
   const windowItemsStore = new Store({ name: 'electronWindowIds'})
+  const actionmaps = new Store({ name: 'actionmapsJSON'})
   const thisWindow = windowItemsStore.get('electronWindowIds')
 
   const HID = require('node-hid');
   //!Functions!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  function blastToUI(data,deviceInfo,receiver) {
-    if (windowItemsStore.get('currentPage') == thisBrain) {
-      const client = BrowserWindow.fromId(thisWindow.win);
-      const package = {
-        data: data,
-        deviceInfo: deviceInfo
-      }
-      if (client) { client.webContents.send(receiver, package); }
-      else { console.log("no client")}
-    }
-  }
   function initializeUI(data,deviceInfo,receiver) { 
-    if (windowItemsStore.get('currentPage') == thisBrain) {
+    if (windowItemsStore.get('currentPage') == 'dashboard') {
       const client = BrowserWindow.fromId(thisWindow.win);
       const package = {
         data: data,
@@ -32,7 +23,7 @@ try {
       else { console.log("no client")}
     }
   }
-  function processAxisBuffer(buffer,buttonArray,hasMoved) {
+  function processAxisBuffer(buffer,buttonArray,medianDistance,hasMoved) {
     let detection = false;
     let ind = null;
     const joystickAxisNames = {
@@ -47,7 +38,7 @@ try {
     const joystickAxes = [1, 3, 5, 7, 11];
     joystickAxes.forEach(index => {
       const bufferValue = buffer[index];
-      if (bufferValue !== undefined && bufferValue !== 30000) {
+      if (bufferValue !== undefined && bufferValue !== medianDistance) {
         const axisName = joystickAxisNames[index];
         detection = axisName;
         ind = Object.entries(buttonArray)
@@ -64,7 +55,7 @@ try {
       .findIndex(([key, value]) => key === detection);
       hasMoved = true
     }
-    if (joystickAxes.every(index => buffer[index] === 30000)) {
+    if (joystickAxes.every(index => buffer[index] === medianDistance)) {
       hasMoved = false;
     }
     if (detection) {
@@ -102,8 +93,6 @@ try {
     return byteArray
   }
   //!Startup Variables!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  const thisBrain = 'dashboard'
-  const store = new Store({ name: `${thisBrain}` })
   // if (!store.get('currentCarrierMarket')) { store.set('currentCarrierMarket',false) }
   // app.on('window-all-closed', () =>{ store.set('redisFirstUpdateflag',false) })
   let devices = HID.devices()
@@ -111,14 +100,13 @@ try {
     .filter(device => device.product !== '')
     .map(device => [device.product, device])))
     .map(([key, value]) => value);
-    
+
   const deviceList = uniqueDevices.map(i=> ({
     product: i.product,
     productId: i.productId,
     vendorId: i.vendorId
   }))
   console.log(deviceList)
-
   //TODO Devices Requested needs to be turned into a store item.
   const devicesRequested = {
     "js1": {
@@ -140,6 +128,7 @@ try {
       "productId": 505 
     }
   }
+  actionmaps.set('deviceList',deviceList)
   const foundDevices = {};
   for (const [key, { vendorId, productId }] of Object.entries(devicesRequested)) {
     foundDevices[key] = devices.find(device => device.vendorId === vendorId && device.productId === productId);
@@ -154,9 +143,7 @@ try {
     js5: joystick5, 
     js6: joystick6, 
     js7: joystick7, 
-    js8: joystick8, 
-    js9: joystick9, 
-    js10: joystick10 
+    js8: joystick8
   } = foundDevices;
   let deviceSetup = {
     js1: 0,
@@ -166,9 +153,7 @@ try {
     js5: 0,
     js6: 0,
     js7: 0,
-    js8: 0,
-    js9: 0,
-    js10: 0
+    js8: 0
   }
 
   //! Functionally setup the frontside once and then watch the joystick buffer for events.
@@ -334,23 +319,28 @@ try {
 
       const handleData = throttle((data) => {
         const byteArray = analyzeBuffer(data)
-        
-        const result_processAxisBuffer = processAxisBuffer(byteArray,buttonArray,hasMoved);
-        if (result_processAxisBuffer) { 
+        const medianDistance = 30000
+        const result_processAxisBuffer = processAxisBuffer(byteArray,buttonArray,medianDistance,hasMoved);
+        if (result_processAxisBuffer) {
+          const package = {
+            data: result_processAxisBuffer,
+            deviceInfo: devicesRequested.js1,
+            receiver: "from_brain-detection"
+          }
           gripAxis_current = result_processAxisBuffer.detection;
           if (gripAxis_current !== gripAxis_previous) {
               switch (gripAxis_current) {
                   case 'x':
-                      console.log('Axis:', result_processAxisBuffer);
-                      if (deviceSetup.js1 == 2) { blastToUI(result_processAxisBuffer,devicesRequested.js1,"from_brain-detection") }
+                      console.log('JS1 Axis:', result_processAxisBuffer);
+                      if (deviceSetup.js1 == 2) { blastToUI(package) }
                       break;
                   case 'y':
-                      console.log('Axis:', result_processAxisBuffer);
-                      if (deviceSetup.js1 == 2) { blastToUI(result_processAxisBuffer,devicesRequested.js1,"from_brain-detection") }
+                      console.log('JS1 Axis:', result_processAxisBuffer);
+                      if (deviceSetup.js1 == 2) { blastToUI(package) }
                       break;
                   default:
-                      console.log('Axis:', result_processAxisBuffer);
-                      if (deviceSetup.js1 == 2) { blastToUI(result_processAxisBuffer,devicesRequested.js1,"from_brain-detection") }
+                      console.log('JS1 Axis:', result_processAxisBuffer);
+                      if (deviceSetup.js1 == 2) { blastToUI(package) }
                       break;
               }
               // Update previous state to current after processing
@@ -360,6 +350,11 @@ try {
         const result_processButtonBuffer = processButtonBuffer(byteArray,buttonArray)
         if (result_processButtonBuffer) {
           gripHandle_current = result_processButtonBuffer.detection;
+          const package = {
+            data: result_processButtonBuffer,
+            deviceInfo: devicesRequested.js1,
+            receiver: "from_brain-detection"
+          }
           if (
                gripHandle_current !== gripHandle_previous 
             && gripHandle_current !== gripHandle_grip
@@ -367,38 +362,38 @@ try {
           ) {
               switch (gripHandle_current) {
                   case 'button1':
-                      console.log('Button:', result_processButtonBuffer);
+                      console.log('JS1 Button:', result_processButtonBuffer);
                       gripHandle_grip = gripHandle_current;
-                      if (deviceSetup.js1 == 2) { blastToUI(result_processButtonBuffer,devicesRequested.js1,"from_brain-detection") }
+                      if (deviceSetup.js1 == 2) { blastToUI(package) }
                       break;
                   case 'button2':
                       if (gripHandle_flip != 3) { 
-                        console.log('Button:', result_processButtonBuffer);
-                        if (deviceSetup.js1 == 2) { blastToUI(result_processButtonBuffer,devicesRequested.js1,"from_brain-detection") }
+                        console.log('JS1 Button:', result_processButtonBuffer);
+                        if (deviceSetup.js1 == 2) { blastToUI(package) }
                       }
                       gripHandle_grip = gripHandle_current;
                       gripHandle_flip = 2;
                       break;
                   case 'button3':
                       if (gripHandle_flip == 2 || gripHandle_flip == 4) { 
-                        console.log('Button:',result_processButtonBuffer) 
-                        if (deviceSetup.js1 == 2) { blastToUI(result_processButtonBuffer,devicesRequested.js1,"from_brain-detection") }
+                        console.log('JS1 Button:',result_processButtonBuffer) 
+                        if (deviceSetup.js1 == 2) { blastToUI(package) }
                       }
                       gripHandle_flip = 3; 
                       break;
                   case 'button4':
-                      console.log('Button:',result_processButtonBuffer)
+                      console.log('JS1 Button:',result_processButtonBuffer)
                       gripHandle_flip = 4;
-                      if (deviceSetup.js1 == 2) { blastToUI(result_processButtonBuffer,devicesRequested.js1,"from_brain-detection") }
+                      if (deviceSetup.js1 == 2) { blastToUI(package) }
                       break;
                   case 'button5':
-                      console.log('Button:',result_processButtonBuffer)
+                      console.log('JS1 Button:',result_processButtonBuffer)
                       gripHandle_flip = 5;
-                      if (deviceSetup.js1 == 2) { blastToUI(result_processButtonBuffer,devicesRequested.js1,"from_brain-detection") }
+                      if (deviceSetup.js1 == 2) { blastToUI(package) }
                       break;
                   default:
-                      console.log('Button:', result_processButtonBuffer);
-                      if (deviceSetup.js1 == 2) { blastToUI(result_processButtonBuffer,devicesRequested.js1,"from_brain-detection") }
+                      console.log('JS1 Button:', result_processButtonBuffer);
+                      if (deviceSetup.js1 == 2) { blastToUI(package) }
                       break;
               }
               // Update previous state to current after processing
@@ -580,23 +575,28 @@ try {
 
       const handleData = throttle((data) => {
         const byteArray = analyzeBuffer(data)
-        
-        const result_processAxisBuffer = processAxisBuffer(byteArray,buttonArray,hasMoved);
+        const medianDistance = 30000
+        const result_processAxisBuffer = processAxisBuffer(byteArray,buttonArray,medianDistance,hasMoved);
         if (result_processAxisBuffer) { 
+          const package = {
+              data: result_processAxisBuffer,
+              deviceInfo: devicesRequested.js2,
+              receiver: "from_brain-detection"
+          }
           gripAxis_current = result_processAxisBuffer.detection;
           if (gripAxis_current !== gripAxis_previous) {
               switch (gripAxis_current) {
                   case 'x':
-                      console.log('Axis:', result_processAxisBuffer);
-                      if (deviceSetup.js2 == 2) { blastToUI(result_processAxisBuffer,devicesRequested.js2,"from_brain-detection") }
+                      console.log('JS2 Axis:', result_processAxisBuffer);
+                      if (deviceSetup.js2 == 2) { blastToUI(package) }
                       break;
                   case 'y':
-                      console.log('Axis:', result_processAxisBuffer);
-                      if (deviceSetup.js2 == 2) { blastToUI(result_processAxisBuffer,devicesRequested.js2,"from_brain-detection") }
+                      console.log('JS2 Axis:', result_processAxisBuffer);
+                      if (deviceSetup.js2 == 2) { blastToUI(package) }
                       break;
                   default:
-                      console.log('Axis:', result_processAxisBuffer);
-                      if (deviceSetup.js2 == 2) { blastToUI(result_processAxisBuffer,devicesRequested.js2,"from_brain-detection") }
+                      console.log('JS2 Axis:', result_processAxisBuffer);
+                      if (deviceSetup.js2 == 2) { blastToUI(package) }
                       break;
               }
               // Update previous state to current after processing
@@ -607,6 +607,11 @@ try {
         if (result_processButtonBuffer) {
           
           gripHandle_current = result_processButtonBuffer.detection;
+          const package = {
+            data: result_processButtonBuffer,
+            deviceInfo: devicesRequested.js2,
+            receiver: "from_brain-detection"
+          }
           if (
                gripHandle_current !== gripHandle_previous 
             && gripHandle_current !== gripHandle_grip
@@ -614,38 +619,38 @@ try {
           ) {
               switch (gripHandle_current) {
                   case 'button1':
-                      console.log('Button:', result_processButtonBuffer);
+                      console.log('JS2 Button:', result_processButtonBuffer);
                       gripHandle_grip = gripHandle_current;
-                      if (deviceSetup.js2 == 2) { blastToUI(result_processButtonBuffer,devicesRequested.js2,"from_brain-detection") }
+                      if (deviceSetup.js2 == 2) { blastToUI(package) }
                       break;
                   case 'button2':
                       if (gripHandle_flip != 3) { 
-                        console.log('Button:', result_processButtonBuffer);
-                        if (deviceSetup.js2 == 2) { blastToUI(result_processButtonBuffer,devicesRequested.js2,"from_brain-detection") }
+                        console.log('JS2 Button:', result_processButtonBuffer);
+                        if (deviceSetup.js2 == 2) { blastToUI(package) }
                       }
                       gripHandle_grip = gripHandle_current;
                       gripHandle_flip = 2;
                       break;
                   case 'button3':
                       if (gripHandle_flip == 2 || gripHandle_flip == 4) { 
-                        console.log('Button:',result_processButtonBuffer) 
-                        if (deviceSetup.js2 == 2) { blastToUI(result_processButtonBuffer,devicesRequested.js2,"from_brain-detection") }
+                        console.log('JS2 Button:',result_processButtonBuffer) 
+                        if (deviceSetup.js2 == 2) { blastToUI(package) }
                       }
                       gripHandle_flip = 3; 
                       break;
                   case 'button4':
-                      console.log('Button:',result_processButtonBuffer)
+                      console.log('JS2 Button:',result_processButtonBuffer)
                       gripHandle_flip = 4;
-                      if (deviceSetup.js2 == 2) { blastToUI(result_processButtonBuffer,devicesRequested.js2,"from_brain-detection") }
+                      if (deviceSetup.js2 == 2) { blastToUI(package) }
                       break;
                   case 'button5':
-                      console.log('Button:',result_processButtonBuffer)
+                      console.log('JS2 Button:',result_processButtonBuffer)
                       gripHandle_flip = 5;
-                      if (deviceSetup.js2 == 2) { blastToUI(result_processButtonBuffer,devicesRequested.js2,"from_brain-detection") }
+                      if (deviceSetup.js2 == 2) { blastToUI(package) }
                       break;
                   default:
-                      console.log('Button:', result_processButtonBuffer);
-                      if (deviceSetup.js2 == 2) { blastToUI(result_processButtonBuffer,devicesRequested.js2,"from_brain-detection") }
+                      console.log('JS2 Button:', result_processButtonBuffer);
+                      if (deviceSetup.js2 == 2) { blastToUI(package) }
                       break;
               }
               // Update previous state to current after processing
@@ -667,15 +672,10 @@ try {
   if (joystick3) {
     const buttonArray = {
       z: {
-        "1": [30000]
+        "0": [30000]
       }
     }
     const device = new HID.HID(joystick3.path)
-    let hasMoved = false;
-    let gripHandle_current = null;
-    let gripHandle_previous = null;
-    let gripHandle_grip = null;
-    let gripHandle_flip = null;
     let gripAxis_current = null;
     let gripAxis_previous = null;
     try {
@@ -683,77 +683,22 @@ try {
 
       const handleData = throttle((data) => {
         const byteArray = analyzeBuffer(data)
-        
-        const result_processAxisBuffer = processAxisBuffer(byteArray,buttonArray,hasMoved);
+        // const medianDistance = 30000
+        // const result_processAxisBuffer = processAxisBuffer(byteArray,buttonArray,medianDistance,hasMoved);
+        const distance = byteArray[1] //buffer value between 0-30000 (left pedal) and 30000-60000 (right pedal)
+        const result_processAxisBuffer = { detection: 'z', ind: 0 }
         if (result_processAxisBuffer) { 
-          gripAxis_current = result_processAxisBuffer.detection;
-          if (gripAxis_current !== gripAxis_previous) {
-              switch (gripAxis_current) {
-                  case 'x':
-                      console.log('Axis:', result_processAxisBuffer);
-                      if (deviceSetup.js3 == 2) { blastToUI(result_processAxisBuffer,devicesRequested.js3,"from_brain-detection") }
-                      break;
-                  case 'y':
-                      console.log('Axis:', result_processAxisBuffer);
-                      if (deviceSetup.js3 == 2) { blastToUI(result_processAxisBuffer,devicesRequested.js3,"from_brain-detection") }
-                      break;
-                  default:
-                      console.log('Axis:', result_processAxisBuffer);
-                      if (deviceSetup.js3 == 2) { blastToUI(result_processAxisBuffer,devicesRequested.js3,"from_brain-detection") }
-                      break;
-              }
-              // Update previous state to current after processing
-              gripAxis_previous = gripAxis_current;
-          }
+          gripAxis_current = distance
+          const package = {
+            data: result_processAxisBuffer,
+            deviceInfo: devicesRequested.js3,
+            receiver: "from_brain-detection"
         }
-        const result_processButtonBuffer = processButtonBuffer(byteArray,buttonArray)
-        if (result_processButtonBuffer) {
-          gripHandle_current = result_processButtonBuffer.detection;
-          if (
-               gripHandle_current !== gripHandle_previous 
-            && gripHandle_current !== gripHandle_grip
-            || gripHandle_flip == 3 
-          ) {
-              switch (gripHandle_current) {
-                  case 'button1':
-                      console.log('Button:', result_processButtonBuffer);
-                      gripHandle_grip = gripHandle_current;
-                      if (deviceSetup.js3 == 2) { blastToUI(result_processButtonBuffer,devicesRequested.js3,"from_brain-detection") }
-                      break;
-                  case 'button2':
-                      if (gripHandle_flip != 3) { 
-                        console.log('Button:', result_processButtonBuffer);
-                        if (deviceSetup.js3 == 2) { blastToUI(result_processButtonBuffer,devicesRequested.js3,"from_brain-detection") }
-                      }
-                      gripHandle_grip = gripHandle_current;
-                      gripHandle_flip = 2;
-                      break;
-                  case 'button3':
-                      if (gripHandle_flip == 2 || gripHandle_flip == 4) { 
-                        console.log('Button:',result_processButtonBuffer) 
-                        if (deviceSetup.js3 == 2) { blastToUI(result_processButtonBuffer,devicesRequested.js3,"from_brain-detection") }
-                      }
-                      gripHandle_flip = 3; 
-                      break;
-                  case 'button4':
-                      console.log('Button:',result_processButtonBuffer)
-                      gripHandle_flip = 4;
-                      if (deviceSetup.js3 == 2) { blastToUI(result_processButtonBuffer,devicesRequested.js3,"from_brain-detection") }
-                      break;
-                  case 'button5':
-                      console.log('Button:',result_processButtonBuffer)
-                      gripHandle_flip = 5;
-                      if (deviceSetup.js3 == 2) { blastToUI(result_processButtonBuffer,devicesRequested.js3,"from_brain-detection") }
-                      break;
-                  default:
-                      console.log('Button:', result_processButtonBuffer);
-                      if (deviceSetup.js3 == 2) { blastToUI(result_processButtonBuffer,devicesRequested.js3,"from_brain-detection") }
-                      break;
-              }
-              // Update previous state to current after processing
-              gripHandle_previous = gripHandle_current;
+          if (gripAxis_current !== gripAxis_previous && distance != 30000) {
+            console.log('JS3 Axis:', gripAxis_current, result_processAxisBuffer)
+            if (deviceSetup.js3 == 2) { blastToUI(package) }
+            gripAxis_previous = gripAxis_current;
           }
-          
         }
       }, 100);
 
@@ -771,7 +716,7 @@ try {
   //Listener
   //Emitter is in dashboard.js
   ipcMain.on('initializer-response', (event,message) => { 
-    logs("[RENDERER]".bgMagenta,logF(message));
+    logs("[RENDERER]".bgMagenta,message);
     deviceSetup[message] = 2
   })
   // ipcMain.on(thisBrain, async (receivedData) => {

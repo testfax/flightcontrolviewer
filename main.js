@@ -29,8 +29,7 @@ function main() {
         "appStatus": "clean"
       })
     }
-    const { windowPosition, autoUpdater } = require('./utils/utilities')
-
+    let { windowPosition, autoUpdater } = require('./utils/utilities')
 
 
 

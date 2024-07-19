@@ -5,18 +5,21 @@ const store = new Store({ name: 'electronWindowIds'})
 const path = require('path')
 const fs = require('fs')
 const colors = require('colors')
-Tail = require('tail').Tail;
+
 const xml2js = require('xml2js');
 
 const util = {
-    convertXML: async() => {
-        let xmlArray = util.client_path().rsi_activeMapping
-        const parser = new xml2js.Parser({ explicitArray: false });
+    convertXML: async(path) => {
+        const xmlArray = fs.readFileSync(path,'utf8', (err,data) => { if (err) return logs_error(err); return data });
+        
+        const parser = new xml2js.Parser({ explicitArray: false })
         let jsonResult = null;
         parser.parseString(xmlArray, (error, result) => {
             if (error) { error = "Error Parsing XML" } 
-            else { jsonResult = JSON.stringify(result, null, 2); }
-        });
+            else { jsonResult = result }
+        })
+        const actionmapsStore = new Store({ name: 'actionmapsJSON'})
+        actionmapsStore.set('actionmaps',jsonResult.ActionMaps)
     },
     cwd: app.isPackaged ? path.join(process.cwd(),'resources','app') : process.cwd(),
     autoUpdater: async () => {
@@ -96,10 +99,6 @@ const util = {
             store.set("windowPosition",result)
         }
     },
-    norm: function(a,b,ext) {
-        let fixed = path.normalize(`${a}/${b}.${ext}`)
-        return fixed
-    },
     client_path: function(request) {
         // if (util.watcherConsoleDisplay('client_path') && request) {
         //     logs("[UTIL]".green,"client_path:".blue,request);
@@ -108,11 +107,14 @@ const util = {
         let rsi_path = path.normalize(rsi_stockLocation)
         const files = fs.readdirSync(rsi_path);
         let rsi_savedMappings = null
-        let rsi_activeMapping = null
+        let rsi_actionmapsPath = null
+        let rsi_actionmaps = null
         let rsi_requested = null
         if (files) { 
             rsi_savedMappings = path.join(rsi_path,'user','client','0','Controls','Mappings')
-            rsi_activeMapping = path.join(rsi_path,'user','client','0','Profiles','default','activemaps.xml')
+            rsi_actionmapsPath = path.join(rsi_path,'user','client','0','Profiles','default')
+            rsi_actionmaps = path.join(rsi_path,'user','client','0','Profiles','default','actionmaps.xml')
+            
             if (request) { 
                 rsi_requested = path.join(rsi_path,request)
                 rsi_requested = path.normalize(rsi_requested)
@@ -131,94 +133,12 @@ const util = {
         return { 
             rsi_path, 
             rsi_savedMappings, 
-            rsi_activeMapping, 
+            rsi_actionmapsPath, 
+            rsi_actionmaps, 
             rsi_requested
         }
     },
-    pageData: { currentPage: "" },
-    logF: (err) => { return JSON.stringify(err, null, 2) },
-    // getCommander: function(data) {
-    //     let loungeClientFile = `${getPath.getHomeFolder()}/Saved Games/Frontier Developments/Elite Dangerous/lounge-client.json`
-    //     loungeClientFile = path.normalize(loungeClientFile)
-    //     let result = fs.readFileSync(loungeClientFile,'utf8', (err) => { if (err) return logs(err); });
-    //     result = JSON.parse(result)
-    //     return result[0].commander
-    // },
-    watcherConsoleDisplay: function(event) {
-        //!Leave blank or with a random string if you dont want to see events.
-        //!If you want to see events, then type the name of the event verbatim in the Array
-        //! Use "All" as index zero to see all events..
-        //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        const eventType = [
-            "All",
-        ] 
-        //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-        for (let a in eventType) { 
-            if (event === eventType[a] || eventType[0] === "All") { 
-                return true; 
-            } 
-        }
-        return false;
-    },
-    errorHandler: function(error,extra,origin) {
-        if (!app.isPackaged) {
-            if (BrowserWindow.fromId(1)) { 
-                BrowserWindow.fromId(1).send('loading-eventActioned',error.stack)
-            }
-            logs_error("\n","[ERROR AREA]".bgYellow,`${extra}`.cyan,"\n","[ERROR STACK]".bgRed,error.stack,"\n","[ERROR ORIGIN]".bgYellow,origin)
-            
-            // if (origin == "ExperimentalWarning") return
-            // let errorGenReport = {}
-            // const currentDateTime = new Date()
-            // errorGenReport.timestamp = currentDateTime.toISOString()
-    
-            // logs("[ERROR TYPE]".red,`${origin}`.yellow)
-            // if (extra) {
-            //     logs("[ERROR Extra]".red, `${extra}`.cyan)
-            // }
-            // let errArray = new Array() 
-            // // logs("TEST".yellow,error);
-            // if (typeof error == 'string') { errArray = error.split("/n") }
-            // if (typeof error == 'object') { 
-            //     let newError = { 
-            //         name: error.name,
-            //         message: error.message,
-            //         stack: error.stack
-            //     }
-            //     Object.entries(newError).forEach(([key,value]) => {
-            //         errArray.push(value)
-            //     })
-            //  }
-            // errArray.forEach((err,index) => {
-            //     if (index == 0) {  console.error("[ERROR PROBLEM]".red,`${err} `.yellow) }
-            //     console.error("[ERROR]".red,`${index} ${err} `.cyan)
-            // })
-            // errorGenReport.stack =  error.stack
-            
-            // logs(`APP ${app.getName().bgBrightRed} exited by ${origin} handler... `.red)
-            // errorFunc.logGenerator(errorGenReport);
-        }
-        if (app.isPackaged) {
-            logs_error("\n","[ERROR AREA]".bgYellow,`${extra}`.cyan,"\n","[ERROR STACK]".bgRed,error.stack,"\n","[ERROR ORIGIN]".bgYellow,origin)
-            if (BrowserWindow.fromId(1)) {
-                //Send critical erro to loading screen
-                BrowserWindow.fromId(1).send('loading-eventActioned',error.stack)
-            }
-            if (BrowserWindow.fromId(2)) {
-                //Terminate the client if criticla error is discovered.
-                app.quit();
-            }
-        }
-        
-    }
+    pageData: ""
 }
 
 module.exports = util

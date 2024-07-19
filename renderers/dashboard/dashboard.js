@@ -137,21 +137,32 @@ function findMatObject(obj, key, value, parentKey = null) {
 }
 
 ipcRenderer.on('from_brain-detection', (package) => {
-  console.log("initialized-device:",package.deviceInfo.position,package.data.detection)
   const changeButton = document.getElementById(`${package.deviceInfo.position}_${package.data.ind}_assignment`)
   changeButton.innerText = package.data.detection
-  const allColors = 
-  changeButton.classList.add('.font-BLOCKY-green .currentButton')
+
+  let allColors = document.getElementsByClassName(`currentButton_${package.deviceInfo.position}`)
+
+  if (allColors.length > 0) {
+    Array.from(allColors).forEach(item => {
+      if (item.classList.contains(`currentButton_${package.deviceInfo.position}`)) {
+        item.classList.remove(`currentButton_${package.deviceInfo.position}`)
+        item.classList.remove('font-BLOCKY-green')
+        item.classList.add('w3-text-orange')
+      }
+    })
+  }
+  changeButton.classList.remove(`w3-text-orange`)
+  changeButton.classList.add('font-BLOCKY-green')
+  changeButton.classList.add(`currentButton_${package.deviceInfo.position}`)
 })
 ipcRenderer.on('from_brain-detection-initialize', (package) => {
-  console.log("device-input:",package.deviceInfo.position)
+  console.log(package)
   document.getElementById(`${package.deviceInfo.position}_position`).innerText = package.deviceInfo.product
   const container = document.getElementById(`${package.deviceInfo.position}bar_container`)
   let dynamicDom = document.getElementsByClassName(`${package.deviceInfo.position}_DynamicDom`)
   dynamicDom = Array.from(dynamicDom)
   dynamicDom.forEach(dom => { dom.remove(); })
 
-  
   try {
     Object.keys(package.data).forEach((slot,index) => {
       const newTR = document.createElement('tr')
