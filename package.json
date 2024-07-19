@@ -40,10 +40,24 @@
   "author": "Medi0cr3",
   "license": "ISC",
   "devDependencies": {
-    "colors": "^1.4.0",
-    "dateformat": "^5.0.3",
     "electron": "^31.2.1",
     "electron-builder": "^24.13.3",
+    "electronmon": "^2.0.3"
+
+  },
+  "electronmon": {
+    "watch": [
+      "*"
+    ],
+    "ignore": [
+      "node_modules/**/*"
+    ]
+  },
+  "dependencies": {
+    "lodash.throttle": "^4.1.1",
+    "node-hid": "^3.1.0",
+    "colors": "^1.4.0",
+    "dateformat": "^5.0.3",
     "electron-log": "^5.1.5",
     "electron-store": "^8.2.0",
     "electron-updater": "^6.3.0",
@@ -53,13 +67,5 @@
     "tail": "^2.2.6",
     "uuid": "^9.0.1",
     "xml2js": "^0.6.2"
-  },
-  "electronmon": {
-    "patterns": [
-      "!./events/Appendix/*.json"
-    ]
-  },
-  "dependencies": {
-    "node-hid": "^3.1.0"
   }
 }

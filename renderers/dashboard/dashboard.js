@@ -137,43 +137,52 @@ function findMatObject(obj, key, value, parentKey = null) {
 }
 
 ipcRenderer.on('from_brain-detection', (package) => {
-  populateDashboardBuffer(package) 
+  console.log("device:",package.deviceInfo.position,package.data.detection)
+  console.log("data:",package.data)
+  document.getElementById(`${package.deviceInfo.position}_${package.data.ind}_assignment`).innerText = package.data.detection
 })
 ipcRenderer.on('from_brain-detection-initialize', (package) => {
-  buildDashboardBuffer(package) 
-})
-function buildDashboardBuffer(package) {
-  console.log("device:",package.deviceInfo)
-  const container = document.getElementById(`${package.deviceInfo}bar_container`)
-  let dynamicDom = document.getElementsByClassName(`${package.deviceInfo}_DynamicDom`)
+  console.log("device:",package.deviceInfo.position)
+  console.log("device:",package.data)
+  document.getElementById(`${package.deviceInfo.position}_position`).innerText = package.deviceInfo.product
+  const container = document.getElementById(`${package.deviceInfo.position}bar_container`)
+  let dynamicDom = document.getElementsByClassName(`${package.deviceInfo.position}_DynamicDom`)
   dynamicDom = Array.from(dynamicDom)
   dynamicDom.forEach(dom => { dom.remove(); })
 
   
-  package.data.forEach((slot,index) => {
-    const newTR = document.createElement('tr')
-    container.appendChild(newTR)
-    newTR.setAttribute('class',`${package.deviceInfo}_DynamicDom ${package.deviceInfo}_DynamicDomTR`)
+  try {
+    
+    Object.keys(package.data).forEach((slot,index) => {
+      const newTR = document.createElement('tr')
+      container.appendChild(newTR)
+      newTR.setAttribute('class',`${package.deviceInfo.position}_DynamicDom ${package.deviceInfo.position}_DynamicDomTR`)
+  
+      const TH1 = document.createElement('th')
+      newTR.appendChild(TH1)
+      TH1.setAttribute('class',`${package.deviceInfo.position}_DynamicDom font-BLOCKY w3-text-orange`)
+      TH1.setAttribute('id',`${package.deviceInfo.position}_${index}_assignment`)
+      TH1.innerText = ""
+  
+      const TH2 = document.createElement('th')
+      newTR.appendChild(TH2)
+      TH2.setAttribute('class',`${package.deviceInfo.position}_DynamicDom font-BLOCKY w3-text-orange`)
+      TH2.setAttribute('id',`${package.deviceInfo.position}_${index}_slot`)
+      TH2.innerText = slot
+  
+      const TH3 = document.createElement('th')
+      newTR.appendChild(TH3)
+      TH3.setAttribute('class',`${package.deviceInfo.position}_DynamicDom font-BLOCKY w3-text-orange`)
+      TH3.setAttribute('id',`${package.deviceInfo.position}_${index}_index`)
+      TH3.innerText = index
+    })
+    ipcRenderer.send('initializer-response',package.deviceInfo.position);
+  }
+  catch (e) {
+    console.log(e)
+  }
+})
 
-    const TH1 = document.createElement('th')
-    newTR.appendChild(TH1)
-    TH1.setAttribute('class',`${package.deviceInfo}_DynamicDom font-BLOCKY w3-text-orange`)
-    TH1.setAttribute('id',`${package.deviceInfo}_${index}`)
-    TH1.innerText = ""
-
-    const TH2 = document.createElement('th')
-    newTR.appendChild(TH2)
-    TH2.setAttribute('class',`${package.deviceInfo}_DynamicDom font-BLOCKY w3-text-orange`)
-    TH2.setAttribute('id',`${package.deviceInfo}_${index}`)
-    TH2.innerText = slot
-
-    const TH3 = document.createElement('th')
-    newTR.appendChild(TH3)
-    TH3.setAttribute('class',`${package.deviceInfo}_DynamicDom font-BLOCKY w3-text-orange`)
-    TH3.setAttribute('id',`${package.deviceInfo}_${index}`)
-    TH3.innerText = index
-  })
-}
 
 // ipcRenderer.on('updateMaterialsStore', (response) => { window.electronStoreMaterials.set('Materials','data',response) })
 // ipcRenderer.on('buildMatHistoryDom', (response) => { buildMatHistoryDom(response) })
