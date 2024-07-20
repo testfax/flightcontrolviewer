@@ -25,11 +25,22 @@ try {
         })
     })
 
-    
+    evaluateActionmaps()
     function evaluateActionmaps() {
         const json = actionmaps.get('actionmaps')
-        let pluggedInDevices = json.ActionProfiles.options.find(i => i.type == "joystick")    
-        console.log("Devices".yellow,pluggedInDevices)
+        //Get Detected Devices
+        const jsonDevices = json.ActionProfiles.options
+            .filter(device => device.$.type === "joystick" && device.$.hasOwnProperty('Product'))    
+            .map(device => device.$)
+        const cleanedDevices = jsonDevices.map(device => {
+            const cleanedProduct = device.Product.replace(/\s*\{.*\}/, '').trim();
+            return {
+                ...device,
+                type: device.type === 'joystick' ? 'js' : device.type,
+                Product: cleanedProduct
+            }
+        })
+        console.log("Detected Devices".yellow,cleanedDevices)
 
     }
 }
