@@ -11,10 +11,11 @@ function main() {
     const colors = require('colors')
     const { windowPosition } = require('./utils/utilities')
     const electronWindowIds = new Store({ name: "electronWindowIds" });
-    electronWindowIds.set('currentPage','test');
-    electronWindowIds.set('socketServerStatus','Not Connected to Server');
+    electronWindowIds.set('currentPage','dashboard');
+    if (!electronWindowIds.get('theme')) {
+      electronWindowIds.set('theme','dark')
+    }
     electronWindowIds.set('appVersion',app.getVersion());
-    electronWindowIds.set('socketRooms',{})
     electronWindowIds.set('mainStayOnTop',false);
     if (app.isPackaged) { electronWindowIds.set('specifyDev',0); }
     else { electronWindowIds.set('specifyDev',1) }
@@ -66,7 +67,7 @@ function main() {
 
     logs("=FLIGHT CONTROL VIEWER= START".green,"isPackaged:".yellow,`${JSON.stringify(app.isPackaged,null,2)}`.cyan, "Version:".yellow,`${JSON.stringify(app.getVersion(),null,2)}`.cyan);
     const { mainMenu,rightClickMenu } = require('./menumaker')
-    nativeTheme.themeSource = 'dark'
+    nativeTheme.themeSource = electronWindowIds.get('theme')
     
     const isNotDev = app.isPackaged
     let appStartTime = null

@@ -9,20 +9,15 @@ try {
   const deviceStateData = new Store({ name: "deviceInfo" });
   const thisWindow = windowItemsStore.get('electronWindowIds')
 
-  // const client = BrowserWindow.fromId(thisWindow.win);
-  // if (client) { client.webContents.send('from_brain-detection-initialize', "DERP"); }
-
   const HID = require('node-hid')
   //!Functions!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   function initializeUI(data,deviceInfo,receiver) { 
-    console.log("HITHIT",data,deviceInfo,receiver)
     if (windowItemsStore.get('currentPage') == 'dashboard') {
       const package = {
         data: data,
         deviceInfo: deviceInfo
       }
       deviceSetup[deviceInfo]
-      console.log("HAHAH:",deviceInfo)
       const client = BrowserWindow.fromId(thisWindow.win)
       if (client) { client.webContents.send(receiver, package) }
       else { console.log("no client") }
@@ -98,8 +93,6 @@ try {
     return byteArray
   }
   //!Startup Variables!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  // if (!store.get('currentCarrierMarket')) { store.set('currentCarrierMarket',false) }
-  // app.on('window-all-closed', () =>{ store.set('redisFirstUpdateflag',false) })
   let devices = HID.devices()
   const uniqueDevices = Array.from(new Map(devices
     .filter(device => device.product !== '')
@@ -706,7 +699,7 @@ try {
             deviceInfo: devicesRequested.js3,
             receiver: "from_brain-detection"
         }
-          if (gripAxis_current !== gripAxis_previous && distance != 30000) {
+          if (gripAxis_current !== gripAxis_previous && (distance >= 55000 || distance <= 10000)) {
             console.log('JS3 Axis:', gripAxis_current, result_processAxisBuffer)
             if (deviceSetup.js3 == 2) { blastToUI(package) }
             gripAxis_previous = gripAxis_current;
