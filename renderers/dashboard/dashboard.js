@@ -20,10 +20,6 @@ windowLoaded.then(() => {
   })
 });
 
-//resource variables
-const journalEvent = "Dashboard"
-
-//FUNCTIONS FROM CLICKING
 window.addEventListener("click", clickedEvent);
 async function clickedEvent(evt) {
   //Use arraySearch(f) to parse through something your looking for in an array or if you are comparing multiple arrays. 
@@ -116,8 +112,6 @@ async function clickedEvent(evt) {
     }
 }
 
-
-
 function findMatObject(obj, key, value, parentKey = null) {
   if (typeof obj === 'object' && obj !== null) {
     if (obj[key] === value) {
@@ -161,8 +155,7 @@ ipcRenderer.on('from_brain-detection-initialize', (package) => {
   const container = document.getElementById(`${package.deviceInfo.position}bar_container`)
   let dynamicDom = document.getElementsByClassName(`${package.deviceInfo.position}_DynamicDom`)
   dynamicDom = Array.from(dynamicDom)
-  dynamicDom.forEach(dom => { dom.remove(); })
-
+  dynamicDom.forEach(dom => { dom.remove() })
   try {
     Object.keys(package.data).forEach((slot,index) => {
       const newTR = document.createElement('tr')

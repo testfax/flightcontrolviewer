@@ -82,7 +82,7 @@ const util = {
         //Then, once you receive the result from getting the contents of the lounge-client.json
         //Update the object with what you want and then send it back as instructions, the function expects an object once you send it.
         let result = store.get("windowPosition")
-        //
+
         if (!result.hasOwnProperty('clientSize')) { 
             return {moveTo:[700,100], resizeTo:[366,600]}
         }
@@ -92,8 +92,8 @@ const util = {
             return { moveTo, resizeTo }
         }
         if (result) {
-            const moved = win.getPosition();
-            const resized = win.getSize();
+            const moved = win.getPosition()
+            const resized = win.getSize()
             result["clientPosition"] = moved 
             result["clientSize"] = resized
             store.set("windowPosition",result)
@@ -137,8 +137,7 @@ const util = {
             rsi_actionmaps, 
             rsi_requested
         }
-    },
-    pageData: ""
+    }
 }
 
 module.exports = util

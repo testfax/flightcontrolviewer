@@ -1,26 +1,31 @@
 const { logs, logs_error } = require('../utils/logConfig')
 try {
   const throttle = require('lodash.throttle');
-  const { pageData } = require('../utils/utilities')
   const { blastToUI } = require('../brain/input-functions')
   const { app, ipcMain, BrowserWindow, webContents  } = require('electron');
   const Store = require('electron-store');
   const windowItemsStore = new Store({ name: 'electronWindowIds'})
   const actionmaps = new Store({ name: 'actionmapsJSON'})
+  const deviceStateData = new Store({ name: "deviceInfo" });
   const thisWindow = windowItemsStore.get('electronWindowIds')
 
-  const HID = require('node-hid');
+  // const client = BrowserWindow.fromId(thisWindow.win);
+  // if (client) { client.webContents.send('from_brain-detection-initialize', "DERP"); }
+
+  const HID = require('node-hid')
   //!Functions!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   function initializeUI(data,deviceInfo,receiver) { 
+    console.log("HITHIT",data,deviceInfo,receiver)
     if (windowItemsStore.get('currentPage') == 'dashboard') {
-      const client = BrowserWindow.fromId(thisWindow.win);
       const package = {
         data: data,
         deviceInfo: deviceInfo
       }
       deviceSetup[deviceInfo]
-      if (client) { client.webContents.send(receiver, package); }
-      else { console.log("no client")}
+      console.log("HAHAH:",deviceInfo)
+      const client = BrowserWindow.fromId(thisWindow.win)
+      if (client) { client.webContents.send(receiver, package) }
+      else { console.log("no client") }
     }
   }
   function processAxisBuffer(buffer,buttonArray,medianDistance,hasMoved) {
@@ -106,8 +111,14 @@ try {
     productId: i.productId,
     vendorId: i.vendorId
   }))
-  console.log(deviceList)
-  //TODO Devices Requested needs to be turned into a store item.
+  if (!deviceStateData.get("devicesRequested")) {
+    deviceStateData.set('devicesRequested','')
+  }
+  else { 
+    //TODO Devices Requested needs to be turned into a store item.
+    // deviceStateData.set('devicesRequested','') 
+  }
+  //TODO Needs to come from a setup UI in the application.
   const devicesRequested = {
     "js1": {
       "position": "js1",
@@ -157,6 +168,7 @@ try {
   }
 
   //! Functionally setup the frontside once and then watch the joystick buffer for events.
+  //TODO Dynamically detect. Detect axis travel some how to get median distance
   if (joystick1) {
     const buttonArray = {
       x: {
@@ -405,13 +417,13 @@ try {
 
       device.on('data', handleData);
       device.on('error', err => {
-        console.error('Joystick 1 error:', err);
+        logs_error('Joystick 1 error:', err);
       })
     }
     catch (e) {
       console.log(e)
     } 
-  } else { console.error('Joystick 1 not found') }
+  } else { logs_error('[BRAIN]'.bgRed,'Joystick 1 not found') }
   if (joystick2) {
     //!buttonArray is specific to VPC Alpha Prime Grip - R
     const buttonArray = {
@@ -662,13 +674,13 @@ try {
 
       device.on('data', handleData);
       device.on('error', err => {
-        console.error('Joystick 2 error:', err);
+        logs_error('Joystick 2 error:', err);
       })
     }
     catch (e) {
       console.log(e)
     } 
-  } else { console.error('Joystick 2 not found') }
+  } else { logs_error('[BRAIN]'.bgRed,'Joystick 2 not found') }
   if (joystick3) {
     const buttonArray = {
       z: {
@@ -676,15 +688,15 @@ try {
       }
     }
     const device = new HID.HID(joystick3.path)
-    let gripAxis_current = null;
-    let gripAxis_previous = null;
+    let gripAxis_current = null
+    let gripAxis_previous = null
     try {
       if (deviceSetup.js3 == 0) { initializeUI(buttonArray,devicesRequested.js3,"from_brain-detection-initialize",); deviceSetup.js3 = 1 }
 
       const handleData = throttle((data) => {
         const byteArray = analyzeBuffer(data)
         // const medianDistance = 30000
-        // const result_processAxisBuffer = processAxisBuffer(byteArray,buttonArray,medianDistance,hasMoved);
+        // const result_processAxisBuffer = processAxisBuffer(byteArray,buttonArray,medianDistance,hasMoved)
         const distance = byteArray[1] //buffer value between 0-30000 (left pedal) and 30000-60000 (right pedal)
         const result_processAxisBuffer = { detection: 'z', ind: 0 }
         if (result_processAxisBuffer) { 
@@ -704,24 +716,22 @@ try {
 
       device.on('data', handleData);
       device.on('error', err => {
-        console.error('Joystick 3 error:', err);
+        logs_error('Joystick 3 error:', err);
       })
     }
     catch (e) {
       console.log(e)
     } 
-  } else { console.error('Joystick 3 not found') }
+  } else { logs_error('[BRAIN]'.bgRed,'Joystick 3 not found') }
 
-  //!Communications between frontside and backside (renderer and main).!!!!!!!!!!!!!!!!!!!
+  //!Communications between frontside and backside (renderer and main(thisfile)).!!!!!!!!!!!!!!!!!!!
   //Listener
   //Emitter is in dashboard.js
+  //Waits for the renderer to initialize the UI before accepting data from the device.
   ipcMain.on('initializer-response', (event,message) => { 
     logs("[RENDERER]".bgMagenta,message);
     deviceSetup[message] = 2
   })
-  // ipcMain.on(thisBrain, async (receivedData) => {
-  //   // logs(`${receivedData}`.cyan)
-  // })
 }
 catch (error) {
   logs_error(error,error.name)
