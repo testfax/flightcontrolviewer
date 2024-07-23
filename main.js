@@ -15,6 +15,9 @@ function main() {
     if (!electronWindowIds.get('theme')) {
       electronWindowIds.set('theme','dark')
     }
+    if (!electronWindowIds.get('showConsoleMessages')) {
+      electronWindowIds.set('showConsoleMessages',0)
+    }
     electronWindowIds.set('appVersion',app.getVersion());
     electronWindowIds.set('mainStayOnTop',false);
     if (app.isPackaged) { electronWindowIds.set('specifyDev',0); }

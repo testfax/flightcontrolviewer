@@ -9,7 +9,7 @@ try {
   const deviceBufferDecode = new Store({ name: 'deviceBufferDecode'})
   const deviceStateData = new Store({ name: "deviceInfo" });
   const thisWindow = windowItemsStore.get('electronWindowIds')
-  const showConsoleMessages = 1
+  const showConsoleMessages = windowItemsStore.get('showConsoleMessages')
   const HID = require('node-hid')
   //!Functions!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   function initializeUI(data,deviceInfo,receiver) { 
@@ -50,7 +50,7 @@ try {
         .findIndex(([key, value]) => key === axisName);
         hasMoved = true
       }
-    });
+    })
   
     //For Virpil
     const sliderIndex = 9;
@@ -105,12 +105,9 @@ try {
     return byteArray
   }
   function findKeybind(key,discoveredKeybinds) {
-    logs("[KEY]".yellow,key)
-    if (key in discoveredKeybinds) {
-        return discoveredKeybinds[key];
-    } else {
-        return 0;
-    }
+    if (showConsoleMessages) { console.log("[findKeyBind]".yellow,key)}
+    if (key in discoveredKeybinds) { return discoveredKeybinds[key] } 
+    else { return 0 }
   }
   //!Startup Variables!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   let devices = HID.devices()
@@ -125,12 +122,19 @@ try {
   // }))
   // actionmaps.set('deviceList',deviceList)
 
-
-  //Get the devices from the user setup.
+  /**
+   * @JSON
+   * Get the devices from the user setup.
+   */
   let devicesRequested = {}
   if (!deviceStateData.get("devicesRequested")) { deviceStateData.set('devicesRequested','') }
   else { devicesRequested = deviceStateData.get('devicesRequested') }
 
+  /**
+   * @object
+   * @key @value pair
+   * object containing the requested devices.
+   */
   const foundDevices = {};
   for (const [key, { vendorId, productId }] of Object.entries(devicesRequested)) {
     foundDevices[key] = devices.find(device => device.vendorId === vendorId && device.productId === productId);
@@ -138,47 +142,52 @@ try {
   if (!deviceBufferDecode.get("deviceBufferDecode")) { deviceBufferDecode.set('deviceBufferDecode',{}) }
   const dbd = deviceBufferDecode.get('deviceBufferDecode')
 
-  //Dynamically add the deviceSetup items so we can plug them in when UI initialization is done.
+  /**
+   * @object
+   * Dynamically add the deviceSetup items so we can plug them in when UI initialization is done.
+   * Contains state information for the UI. 
+   * Once the UI is setup, it changes flags so that new joystick information can be sent to the UI.
+   * Controls joystick buffer information flow to the UI.
+   */
+  //
   const deviceSetup = {};
     for (const key of Object.keys(foundDevices)) {
         deviceSetup[key] = 0;
     }
-  //! Functionally setup the frontside once and then watch the joystick buffer for events
-
+  /**
+   * @function
+   * Sets up all devices and watches for device buffers to enter and parses
+   */
   const keys = Object.keys(foundDevices);
   keys.forEach(jsId => {
     if (foundDevices[jsId] != undefined) { 
-      logs(jsId)
-      logs(foundDevices[jsId])
-      
-      const buttonArray = dbd.vendorIds[foundDevices[jsId].vendorId]?.products[foundDevices[jsId].productId]
-      const device = new HID.HID(foundDevices[jsId].path)
-      let hasMoved = false;
-      let gripHandle_current = null
-      let gripHandle_previous = null
-      let gripHandle_grip = null
-      let gripHandle_flip = null
-      let gripAxis_current = null
-      let gripAxis_previous = null
-      let virpil_pedal_movementDetected = false
-      let virpil_pedal_distance = null
-      const requestedDevices = devicesRequested[jsId]
       try {
+        // logs(jsId)
+        // logs(foundDevices[jsId])
+        
+        const buttonArray = dbd.vendorIds[foundDevices[jsId].vendorId]?.products[foundDevices[jsId].productId]
+        const device = new HID.HID(foundDevices[jsId].path)
+        let hasMoved = false;
+        let gripHandle_current = null
+        let gripHandle_previous = null
+        let gripHandle_grip = null
+        let gripHandle_flip = null
+        let gripAxis_current = null
+        let gripAxis_previous = null
+        let virpil_pedal_movementDetected = false
+        let virpil_pedal_distance = null
+        const requestedDevices = devicesRequested[jsId]
         if (deviceSetup[jsId] == 0) { initializeUI(buttonArray.bufferDecoded,requestedDevices,"from_brain-detection-initialize",); deviceSetup[jsId] = 1 }
         const handleData = throttle((data) => {
           const byteArray = analyzeBuffer(data)
-  
   
           //TODO Detect axis travel some how to get median distance
           let medianDistance = 30000
           if (foundDevices[jsId].vendorId == 13124) { //virpil shows median on all x,y,z,z(pedals) devices as 30000
             medianDistance = 30000
           }
-  
-  
-  
-  
-          let result_processAxisBuffer = processAxisBuffer(byteArray,buttonArray.bufferDecoded,medianDistance,hasMoved);
+
+          let result_processAxisBuffer = processAxisBuffer(byteArray,buttonArray.bufferDecoded,medianDistance,hasMoved)
           //!virpil VPC ACE-Torq Rudder (START)
           const device_virpil_pedals = foundDevices[jsId].vendorId == 13124 && foundDevices[jsId].productId == 505
           if (device_virpil_pedals) {
@@ -194,12 +203,12 @@ try {
               deviceInfo: requestedDevices,
               receiver: "from_brain-detection"
             }
-            gripAxis_current = result_processAxisBuffer.detection;
-  
+            gripAxis_current = result_processAxisBuffer.detection
+
             //!virpil VPC ACE-Torq Rudder (START)
             if (device_virpil_pedals) {
               gripAxis_current = virpil_pedal_distance
-              if (!virpil_pedal_movementDetected && gripAxis_current !== 30000) {
+              if (!virpil_pedal_movementDetected && gripAxis_current !== medianDistance) {
                 virpil_pedal_movementDetected = true
                 if (showConsoleMessages) { logs(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer.detection, result_processAxisBuffer) }
                 if (deviceSetup[jsId] == 2) {
@@ -208,7 +217,7 @@ try {
                 }
                 gripAxis_previous = gripAxis_current;
               } 
-              else if (virpil_pedal_movementDetected && gripAxis_current === 30000) {
+              else if (virpil_pedal_movementDetected && gripAxis_current === medianDistance) {
                 virpil_pedal_movementDetected = false
               }
             }
@@ -324,7 +333,7 @@ try {
         device.on('error', err => { logs_error(`Joystick ${jsId.replace(/^js/,'')} error:`, err) })
       }
       catch (e) {
-            logs_error(e)
+        logs_error(e)
       }
     }
   })

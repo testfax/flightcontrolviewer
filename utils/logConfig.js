@@ -3,7 +3,38 @@ try {
     const fs = require('fs')
     const path = require('path')
     const log = require('electron-log')
-
+    // ANSI Color Codes
+    // https://talyian.github.io/ansicolors/
+    const colorz = {
+        reset: '\x1B[0m',
+        key: '\x1B[32m', // Green for keys
+        stringValue: '\x1B[38;5;208m', // Orange for string values
+        numberValue: '\x1B[33m' // Yellow for number values
+    }
+    function colorizeObject(obj) {
+        return Object.entries(obj).map(([key, value]) => {
+            let coloredKey = `${colorz.key}"${key}"${colorz.reset}`
+            let coloredValue
+            if (typeof value === 'string') {
+                coloredValue = `${colorz.stringValue}"${value}"${colorz.reset}`
+            } else if (typeof value === 'number') {
+                coloredValue = `${colorz.numberValue}${value}${colorz.reset}`
+            } else if (typeof value === 'boolean') {
+                coloredValue = `${colorz.numberValue}${value}${colorz.reset}`
+            } else if (typeof value === 'object' && value !== null) {
+                coloredValue = `{\n${colorizeObject(value)}\n}`
+            } else {
+                coloredValue = value
+            }
+            
+            return `${coloredKey}: ${coloredValue}`
+        }).join(',\n')
+    }
+    function colorizeJSON(jsonString) {
+        const obj = JSON.parse(jsonString)
+        const colored = colorizeObject(obj)
+        return `{\n${colored}\n}`
+    }
     function lastLogs(dir,ext,amount) {
         try {
             const files = fs.readdirSync(dir);
@@ -114,17 +145,29 @@ try {
             return
         }
     }
-
+    
     const logsUtil = {
         logs: async (...input) => {
-            let logMessage = input.join(' ');
+            let logMessage = input.map(item => {
+                if (typeof item === 'object') {
+                    return colorizeJSON(JSON.stringify(item, null, 2));
+                } else {
+                    return item;
+                }
+            }).join(' ');
             log.info(logMessage);
         },
         logs_error: async (...input) => {
-            let logMessage = input.join(' ');
-            log.error(logMessage);
+            let logMessage = input.map(item => {
+                if (typeof item === 'object') {
+                    return colorizeJSON(JSON.stringify(item, null, 2));
+                } else {
+                    return item;
+                }
+            }).join(' ');
+            log.error(logMessage)
         }
-    }
+    };
     module.exports = logsUtil;
 }
 catch(e) { console.log("Logs Not Ready",e) }
