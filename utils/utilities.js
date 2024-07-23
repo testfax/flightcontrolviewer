@@ -10,16 +10,89 @@ const xml2js = require('xml2js');
 
 const util = {
     convertXML: async(path) => {
-        const xmlArray = fs.readFileSync(path,'utf8', (err,data) => { if (err) return logs_error(err); return data });
+        try {
+            logs("[XML]".bgYellow,"Reading actionsmap.xml")
+            const xmlArray = fs.readFileSync(path,'utf8', (err,data) => { if (err) return logs_error("[XML]".bgRed,err); return data });
+            
+            const parser = new xml2js.Parser({ explicitArray: false })
+            let jsonResult = null;
+            parser.parseString(xmlArray, (error, result) => {
+                if (error) throw error
+                else { jsonResult = result }
+            })
+            const actionmapsStore = new Store({ name: 'actionmapsJSON'})
+            actionmapsStore.set('actionmaps',jsonResult.ActionMaps)
+        }
+        catch (e) {
+            logs_error("[XML]".bgRed,e);
+        }
         
-        const parser = new xml2js.Parser({ explicitArray: false })
-        let jsonResult = null;
-        parser.parseString(xmlArray, (error, result) => {
-            if (error) { error = "Error Parsing XML" } 
-            else { jsonResult = result }
-        })
+    },
+    buildXML: async() => {
+        const file = util.client_path().rsi_actionmaps
         const actionmapsStore = new Store({ name: 'actionmapsJSON'})
-        actionmapsStore.set('actionmaps',jsonResult.ActionMaps)
+        
+        logs("[XML]".bgYellow,"Building actionsmap.xml")
+        // Read the actionmaps.xml file
+        fs.readFile(file, 'utf8', (err, data) => {
+            if (err) {
+                logs_error("[XML]".bgRed,'Error reading the file:', err);
+                return;
+            }
+            // Parse the XML data
+            xml2js.parseString(data, (err, result) => {
+            if (err) {
+                logs_error("[XML]".bgRed,'Error parsing XML:', err);
+                return;
+            }
+        
+            // Find the actionmap with the name 'spaceship_movement'
+            const actionmap = result.actionmaps.actionmap.find(am => am.$.name === 'spaceship_movement');
+        
+            if (!actionmap) {
+                logs_error("[XML]".bgRed,'spaceship_movement actionmap not found.');
+                return;
+            }
+        
+            // Check if the actions v_yaw and v_pitch are present
+            const actions = actionmap.action || [];
+            const vYawAction = actions.find(a => a.$.name === 'v_yaw');
+            const vPitchAction = actions.find(a => a.$.name === 'v_pitch');
+        
+            // Add missing actions
+            if (!vYawAction) {
+                actions.push({
+                $: { name: 'v_yaw' },
+                rebind: [{ $: { input: 'js1_x' } }]
+                });
+            }
+        
+            if (!vPitchAction) {
+                actions.push({
+                $: { name: 'v_pitch' },
+                rebind: [{ $: { input: 'js1_y' } }]
+                });
+            }
+        
+            // Update the actionmap actions
+            actionmap.action = actions;
+            
+
+            // Build the updated XML
+            const builder = new xml2js.Builder();
+            const updatedXml = builder.buildObject(result);
+        
+            // Write the updated XML back to the file
+            fs.writeFile(file, updatedXml, 'utf8', (err) => {
+                if (err) {
+                    logs_error("[XML]".bgRed,'Error writing the file:', err);
+                    return;
+                }
+                actionmapsStore.set('actionmaps',updatedXml)
+                logs("[XML]".bgGreen,"XML Built");
+            });
+            });
+        });
     },
     cwd: app.isPackaged ? path.join(process.cwd(),'resources','app') : process.cwd(),
     autoUpdater: async () => {

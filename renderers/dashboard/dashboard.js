@@ -108,7 +108,7 @@ async function clickedEvent(evt) {
       // }
     }
     else {
-      drop(clickedEvent[0],journalEvent) //review function for HTML class requirements.
+      drop(clickedEvent[0],'dashboard') //review function for HTML class requirements.
     }
 }
 
@@ -132,7 +132,27 @@ function findMatObject(obj, key, value, parentKey = null) {
 
 ipcRenderer.on('from_brain-detection', (package) => {
   const changeButton = document.getElementById(`${package.deviceInfo.position}_${package.data.ind}_assignment`)
-  changeButton.innerText = package.data.detection
+
+
+  let bindStack = []
+  if (package.keybindArray != 0) { 
+    package.keybindArray.forEach(item => {
+      bindStack.push({ [item.categoryName] : { "action": item.actions[0] } })
+    })
+    console.log("STACK:",bindStack)
+    let screenReady = '';
+    bindStack.forEach(item => {
+      for (let category in item) {
+        screenReady += `CAT: ${category}\n`;
+        screenReady += `- ACTION: ${item[category].action}\n`;
+      }
+    })
+    changeButton.innerText = screenReady
+  }
+  else {
+    changeButton.innerText = package.data.detection
+  }
+
 
   let allColors = document.getElementsByClassName(`currentButton_${package.deviceInfo.position}`)
 

@@ -78,7 +78,6 @@ function main() {
       try {
         // Create a loading screen window
         win = new BrowserWindow({
-          title: `Elite Pilots Lounge`,
           width: !isNotDev ? 1000 : 500,
           height: 800,
           webPreferences: {
@@ -96,7 +95,7 @@ function main() {
         win.loadFile(path.join(__dirname, './renderers/dashboard/dashboard.html'))
 
         win.on("ready-to-show", () => {
-          // win.setTitle(`Flight Control Viewer - ${app.getVersion()}`)
+          win.setTitle(`Flight Control Viewer - ${app.getVersion()}`)
           const windowPositionz = windowPosition(win,1)
           win.setPosition(windowPositionz.moveTo[0],windowPositionz.moveTo[1])
           win.setSize(windowPositionz.resizeTo[0],windowPositionz.resizeTo[1])
@@ -144,7 +143,7 @@ function main() {
       return
     })
     process.on('uncaughtException', (error,origin) => {
-      logs_error(error,origin)
+      logs_error(error,origin,error.stack)
       //  logs('ReferenceError occurred:'.red, error.stack);
     })
     .on('unhandledRejection', (error, origin) => {
