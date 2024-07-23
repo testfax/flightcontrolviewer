@@ -135,44 +135,44 @@ try {
 
 
         //!###### not used ##############
-        function listCategories(actionmap) {
-            return actionmap.map(category => {
-                if (category.$ && category.$.name) {
-                    return category.$.name;
-                }
-                return null; // Return null if the name is not found
-            }).filter(name => name !== null); // Filter out null values
-        }
-        function findCategory(actionmap, categoryName) {
-            for (const category of actionmap) {
-                if (category.$ && category.$.name === categoryName) {
-                    return category;
-                }
-            }
-            return null; // Return null if category is not found
-        }
-        function findAndRenameCategoryWithActions(actionmap, categoryName) {
-            for (const category of actionmap) {
-                if (category.$ && category.$.name === categoryName) {
-                    const newCategoryName = category.$.name
-                    const renamedActions = category.action.map(action => {
-                        if (action.$) {
-                            const newActionName = action.$.name;
-                            return {
-                                [newActionName]: {
-                                    rebind: action.rebind
-                                }
-                            }
-                        }
-                        return action; 
-                    });
-                    return {
-                        [newCategoryName]: renamedActions
-                    }
-                }
-            }
-            return null
-        }
+        // function listCategories(actionmap) {
+        //     return actionmap.map(category => {
+        //         if (category.$ && category.$.name) {
+        //             return category.$.name;
+        //         }
+        //         return null; // Return null if the name is not found
+        //     }).filter(name => name !== null); // Filter out null values
+        // }
+        // function findCategory(actionmap, categoryName) {
+        //     for (const category of actionmap) {
+        //         if (category.$ && category.$.name === categoryName) {
+        //             return category;
+        //         }
+        //     }
+        //     return null; // Return null if category is not found
+        // }
+        // function findAndRenameCategoryWithActions(actionmap, categoryName) {
+        //     for (const category of actionmap) {
+        //         if (category.$ && category.$.name === categoryName) {
+        //             const newCategoryName = category.$.name
+        //             const renamedActions = category.action.map(action => {
+        //                 if (action.$) {
+        //                     const newActionName = action.$.name;
+        //                     return {
+        //                         [newActionName]: {
+        //                             rebind: action.rebind
+        //                         }
+        //                     }
+        //                 }
+        //                 return action; 
+        //             });
+        //             return {
+        //                 [newCategoryName]: renamedActions
+        //             }
+        //         }
+        //     }
+        //     return null
+        // }
         // const categories = listCategories(actionmap)
         //!Individual Category Name
         // const category = "spaceship_general"

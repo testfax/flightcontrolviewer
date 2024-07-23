@@ -139,7 +139,7 @@ ipcRenderer.on('from_brain-detection', (package) => {
     package.keybindArray.forEach(item => {
       bindStack.push({ [item.categoryName] : { "action": item.actions[0] } })
     })
-    console.log("STACK:",bindStack)
+    // console.log("STACK:",bindStack)
     let screenReady = '';
     bindStack.forEach(item => {
       for (let category in item) {
@@ -170,7 +170,6 @@ ipcRenderer.on('from_brain-detection', (package) => {
   changeButton.classList.add(`currentButton_${package.deviceInfo.position}`)
 })
 ipcRenderer.on('from_brain-detection-initialize', (package) => {
-  console.log(package)
   document.getElementById(`${package.deviceInfo.position}_position`).innerText = package.deviceInfo.product
   const container = document.getElementById(`${package.deviceInfo.position}bar_container`)
   let dynamicDom = document.getElementsByClassName(`${package.deviceInfo.position}_DynamicDom`)
