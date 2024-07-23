@@ -137,7 +137,7 @@ try {
   }
   if (!deviceBufferDecode.get("deviceBufferDecode")) { deviceBufferDecode.set('deviceBufferDecode',{}) }
   const dbd = deviceBufferDecode.get('deviceBufferDecode')
-  
+
   //Dynamically add the deviceSetup items so we can plug them in when UI initialization is done.
   const deviceSetup = {};
     for (const key of Object.keys(foundDevices)) {
@@ -153,15 +153,15 @@ try {
     const buttonArray = dbd.vendorIds[foundDevices[jsId].vendorId]?.products[foundDevices[jsId].productId]
     const device = new HID.HID(foundDevices[jsId].path)
     let hasMoved = false;
-    let gripHandle_current = null;
-    let gripHandle_previous = null;
-    let gripHandle_grip = null;
-    let gripHandle_flip = null;
-    let gripAxis_current = null;
-    let gripAxis_previous = null;
-    let virpil_pedal_movementDetected = false;
-    let virpil_pedal_distance = null;
-    const requestedDevices = devicesRequested[jsId];
+    let gripHandle_current = null
+    let gripHandle_previous = null
+    let gripHandle_grip = null
+    let gripHandle_flip = null
+    let gripAxis_current = null
+    let gripAxis_previous = null
+    let virpil_pedal_movementDetected = false
+    let virpil_pedal_distance = null
+    const requestedDevices = devicesRequested[jsId]
     try {
       if (deviceSetup[jsId] == 0) { initializeUI(buttonArray.bufferDecoded,requestedDevices,"from_brain-detection-initialize",); deviceSetup[jsId] = 1 }
       const handleData = throttle((data) => {
