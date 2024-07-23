@@ -27,6 +27,8 @@ try {
   function processAxisBuffer(buffer,buttonArray,medianDistance,hasMoved) {
     let detection = false;
     let ind = null;
+
+    //vor Virpil
     const joystickAxisNames = {
       1: 'x',
       3: 'y',
@@ -35,8 +37,10 @@ try {
       9: 'slider',
       11: 'z'
     };
-    
     const joystickAxes = [1, 3, 5, 7, 11];
+    //
+
+
     joystickAxes.forEach(index => {
       const bufferValue = buffer[index];
       if (bufferValue !== undefined && bufferValue !== medianDistance) {
@@ -48,6 +52,7 @@ try {
       }
     });
   
+    //For Virpil
     const sliderIndex = 9;
     const sliderValue = buffer[sliderIndex];
     if (sliderValue !== undefined && sliderValue > 0) {
@@ -56,6 +61,10 @@ try {
       .findIndex(([key, value]) => key === detection);
       hasMoved = true
     }
+    //
+
+
+
     if (joystickAxes.every(index => buffer[index] === medianDistance)) {
       hasMoved = false;
     }
@@ -63,7 +72,7 @@ try {
       return { detection, ind }
     }
   }
-  function processButtonBuffer(buffer,buttonArray) {
+  function virpil_processButtonBuffer(buffer,buttonArray) { //FOR VIRPIL
     let detection = false;
   
     for (const [buttonName, indexes] of Object.entries(buttonArray)) {
@@ -87,9 +96,11 @@ try {
   function analyzeBuffer(data) {
     let byteArray = []
     for (let i = 0; i < data.length; i++) {
+        //For Virpil
         if (i != 36) { 
           byteArray.push(data.readUInt16LE(i))
         }
+        //
     }
     return byteArray
   }
@@ -126,6 +137,7 @@ try {
   }
   if (!deviceBufferDecode.get("deviceBufferDecode")) { deviceBufferDecode.set('deviceBufferDecode',{}) }
   const dbd = deviceBufferDecode.get('deviceBufferDecode')
+  
   //Dynamically add the deviceSetup items so we can plug them in when UI initialization is done.
   const deviceSetup = {};
     for (const key of Object.keys(foundDevices)) {
@@ -222,7 +234,7 @@ try {
           }
         }
         //! BUTTON
-        const result_processButtonBuffer = processButtonBuffer(byteArray,buttonArray.bufferDecoded)
+        const result_processButtonBuffer = virpil_processButtonBuffer(byteArray,buttonArray.bufferDecoded)
         if (result_processButtonBuffer) {
           gripHandle_current = result_processButtonBuffer.detection;
           if (
