@@ -21,7 +21,7 @@ try {
       deviceSetup[deviceInfo]
       const client = BrowserWindow.fromId(thisWindow.win)
       if (client) { client.webContents.send(receiver, package) }
-      else { console.log("no client") }
+      else { logs_error("no client") }
     }
   }
   function processAxisBuffer(buffer,buttonArray,medianDistance,hasMoved) {
@@ -71,7 +71,7 @@ try {
         for (const [index, values] of Object.entries(indexes)) {
           const bufferValue = buffer[parseInt(index)];
           if (bufferValue !== undefined && values.includes(bufferValue)) {
-            // console.log(`Detected ${buttonName} at buffer index ${index} with value ${bufferValue}`);
+            // logs(`Detected ${buttonName} at buffer index ${index} with value ${bufferValue}`);
             detection = buttonName;
             ind = Object.entries(buttonArray)
             .findIndex(([key, value]) => key === buttonName);
@@ -94,7 +94,7 @@ try {
     return byteArray
   }
   function findKeybind(key,discoveredKeybinds) {
-    console.log("[KEY]".yellow,key)
+    logs("[KEY]".yellow,key)
     if (key in discoveredKeybinds) {
         return discoveredKeybinds[key];
     } else {
@@ -103,20 +103,23 @@ try {
   }
   //!Startup Variables!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   let devices = HID.devices()
-  const uniqueDevices = Array.from(new Map(devices
-    .filter(device => device.product !== '')
-    .map(device => [device.product, device])))
-    .map(([key, value]) => value);
-  const deviceList = uniqueDevices.map(i=> ({
-    product: i.product,
-    productId: i.productId,
-    vendorId: i.vendorId
-  }))
+  // const uniqueDevices = Array.from(new Map(devices
+  //   .filter(device => device.product !== '')
+  //   .map(device => [device.product, device])))
+  //   .map(([key, value]) => value);
+  // const deviceList = uniqueDevices.map(i=> ({
+  //   product: i.product,
+  //   productId: i.productId,
+  //   vendorId: i.vendorId
+  // }))
+  // actionmaps.set('deviceList',deviceList)
+
+
   //Get the devices from the user setup.
   let devicesRequested = {}
   if (!deviceStateData.get("devicesRequested")) { deviceStateData.set('devicesRequested','') }
   else { devicesRequested = deviceStateData.get('devicesRequested') }
-  actionmaps.set('deviceList',deviceList)
+
   const foundDevices = {};
   for (const [key, { vendorId, productId }] of Object.entries(devicesRequested)) {
     foundDevices[key] = devices.find(device => device.vendorId === vendorId && device.productId === productId);
@@ -132,8 +135,8 @@ try {
 
   const keys = Object.keys(foundDevices);
   keys.forEach(jsId => {
-    // console.log(jsId)
-    // console.log(foundDevices[jsId])
+    // logs(jsId)
+    // logs(foundDevices[jsId])
     
     const buttonArray = dbd.vendorIds[foundDevices[jsId].vendorId]?.products[foundDevices[jsId].productId]
     const device = new HID.HID(foundDevices[jsId].path)
@@ -185,7 +188,7 @@ try {
             gripAxis_current = virpil_pedal_distance
             if (!virpil_pedal_movementDetected && gripAxis_current !== 30000) {
               virpil_pedal_movementDetected = true
-              if (showConsoleMessages) { console.log(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer.detection, result_processAxisBuffer) }
+              if (showConsoleMessages) { logs(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer.detection, result_processAxisBuffer) }
               if (deviceSetup[jsId] == 2) {
                 package.keybindArray = findKeybind(`${requestedDevices.position}_${result_processAxisBuffer.detection}`,actionmaps.get('discoveredKeybinds'))
                 blastToUI(package) 
@@ -201,42 +204,19 @@ try {
             && !device_virpil_pedals
           ) {
             if (foundDevices[jsId].vendorId == 13124) {
-              if (showConsoleMessages) { console.log(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer);}
+              if (showConsoleMessages) { logs(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer);}
               if (deviceSetup[jsId] == 2) {
                 package.keybindArray = findKeybind(`${requestedDevices.position}_${gripAxis_current}`,actionmaps.get('discoveredKeybinds'))
                 blastToUI(package) 
               }
             }
             else {
-              if (showConsoleMessages) { console.log(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer);}
+              if (showConsoleMessages) { logs(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer);}
               if (deviceSetup[jsId] == 2) {
                 package.keybindArray = findKeybind(`${requestedDevices.position}_${gripAxis_current}`,actionmaps.get('discoveredKeybinds'))
                 blastToUI(package) 
               }
             }
-            // switch (gripAxis_current) {
-            //     case 'x':
-            //         if (showConsoleMessages) { console.log(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer); }
-            //         if (deviceSetup[jsId] == 2) {
-            //           package.keybindArray = findKeybind(`${requestedDevices.position}_${gripAxis_current}`,actionmaps.get('discoveredKeybinds'))
-            //           blastToUI(package)
-            //         }
-            //         break;
-            //     case 'y':
-            //       if (showConsoleMessages) { console.log(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer);}
-            //         if (deviceSetup[jsId] == 2) {
-            //           package.keybindArray = findKeybind(`${requestedDevices.position}_${gripAxis_current}`,actionmaps.get('discoveredKeybinds'))
-            //           blastToUI(package) 
-            //         }
-            //         break;
-            //     default:
-            //       if (showConsoleMessages) { console.log(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer);}
-            //         if (deviceSetup[jsId] == 2) {
-            //           package.keybindArray = findKeybind(`${requestedDevices.position}_${gripAxis_current}`,actionmaps.get('discoveredKeybinds'))
-            //           blastToUI(package) 
-            //         }
-            //         break;
-            // }
             // Update previous state to current after processing
             gripAxis_previous = gripAxis_current;
           }
@@ -256,10 +236,10 @@ try {
               deviceInfo: requestedDevices,
               receiver: "from_brain-detection"
             }
-            if (foundDevices[jsId].vendorId == 13124) {
+            if (foundDevices[jsId].vendorId == 13124) { //virpil buttons 1 through 5 have a lever(button3) that can actuate 2 different states. However, star citizen does not recognize the lever(button3) as a button+button combo.
               switch (gripHandle_current) {
                 case 'button1':
-                  if (showConsoleMessages) { console.log(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
+                  if (showConsoleMessages) { logs(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
                     gripHandle_grip = gripHandle_current;
                     if (deviceSetup[jsId] == 2) {
                       package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
@@ -268,7 +248,7 @@ try {
                     break;
                 case 'button2':
                     if (gripHandle_flip != 3) { 
-                      if (showConsoleMessages) { console.log(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
+                      if (showConsoleMessages) { logs(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
                       if (deviceSetup[jsId] == 2) {
                         package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
                         blastToUI(package) 
@@ -279,7 +259,7 @@ try {
                     break;
                 case 'button3':
                     if (gripHandle_flip == 2 || gripHandle_flip == 4) { 
-                      if (showConsoleMessages) { console.log(`${jsId.toUpperCase()} Button:`,result_processButtonBuffer)  }
+                      if (showConsoleMessages) { logs(`${jsId.toUpperCase()} Button:`,result_processButtonBuffer)  }
                       if (deviceSetup[jsId] == 2) {
                         package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
                         blastToUI(package) 
@@ -288,7 +268,7 @@ try {
                     gripHandle_flip = 3; 
                     break;
                 case 'button4':
-                  if (showConsoleMessages) { console.log(`${jsId.toUpperCase()} Button:`,result_processButtonBuffer) }
+                  if (showConsoleMessages) { logs(`${jsId.toUpperCase()} Button:`,result_processButtonBuffer) }
                     gripHandle_flip = 4;
                     if (deviceSetup[jsId] == 2) {
                       package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
@@ -296,7 +276,7 @@ try {
                     }
                     break;
                 case 'button5':
-                  if (showConsoleMessages) { console.log(`${jsId.toUpperCase()} Button:`,result_processButtonBuffer) }
+                  if (showConsoleMessages) { logs(`${jsId.toUpperCase()} Button:`,result_processButtonBuffer) }
                     gripHandle_flip = 5;
                     if (deviceSetup[jsId] == 2) {
                       package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
@@ -304,7 +284,7 @@ try {
                     }
                     break;
                 default:
-                  if (showConsoleMessages) { console.log(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
+                  if (showConsoleMessages) { logs(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
                     if (deviceSetup[jsId] == 2) {
                       package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
                       blastToUI(package) 
@@ -313,7 +293,7 @@ try {
             }
             }
             else {
-              if (showConsoleMessages) { console.log(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
+              if (showConsoleMessages) { logs(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
               gripHandle_grip = gripHandle_current
               if (deviceSetup[jsId] == 2) {
                 package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
