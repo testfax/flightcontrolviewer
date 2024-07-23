@@ -10,7 +10,7 @@ try {
     
     const rsi_actionmapsPath = client_path().rsi_actionmapsPath
     convertXML(client_path().rsi_actionmaps)
-    logs("[DET]".bgCyan,"Keys Mapped")
+    logs("[DET]".bgCyan,"Init - Keys Mapped")
     watcherPath = chokidar.watch(rsi_actionmapsPath, {
         persistent: true,
         ignoreInitial: false,
@@ -25,7 +25,7 @@ try {
         watcherPath.on("change", rsi_actionmapsPath => {
             convertXML(client_path().rsi_actionmaps)
             evaluateActionmaps()
-            logs("[DET]".bgCyan,"Keys Mapped")
+            logs("[DET]".bgCyan,"Detected file change, Keys Mapped")
         })
     })
 

@@ -22,11 +22,11 @@ const util = {
             })
             const actionmapsStore = new Store({ name: 'actionmapsJSON'})
             actionmapsStore.set('actionmaps',jsonResult.ActionMaps)
+            util.buildXML()
         }
         catch (e) {
             logs_error("[XML]".bgRed,e);
         }
-        
     },
     buildXML: async() => {
         const file = util.client_path().rsi_actionmaps
@@ -41,56 +41,55 @@ const util = {
             }
             // Parse the XML data
             xml2js.parseString(data, (err, result) => {
-            if (err) {
-                logs_error("[XML]".bgRed,'Error parsing XML:', err);
-                return;
-            }
-        
-            // Find the actionmap with the name 'spaceship_movement'
-            const actionmap = result.actionmaps.actionmap.find(am => am.$.name === 'spaceship_movement');
-        
-            if (!actionmap) {
-                logs_error("[XML]".bgRed,'spaceship_movement actionmap not found.');
-                return;
-            }
-        
-            // Check if the actions v_yaw and v_pitch are present
-            const actions = actionmap.action || [];
-            const vYawAction = actions.find(a => a.$.name === 'v_yaw');
-            const vPitchAction = actions.find(a => a.$.name === 'v_pitch');
-        
-            // Add missing actions
-            if (!vYawAction) {
-                actions.push({
-                $: { name: 'v_yaw' },
-                rebind: [{ $: { input: 'js1_x' } }]
-                });
-            }
-        
-            if (!vPitchAction) {
-                actions.push({
-                $: { name: 'v_pitch' },
-                rebind: [{ $: { input: 'js1_y' } }]
-                });
-            }
-        
-            // Update the actionmap actions
-            actionmap.action = actions;
-            
-
-            // Build the updated XML
-            const builder = new xml2js.Builder();
-            const updatedXml = builder.buildObject(result);
-        
-            // Write the updated XML back to the file
-            fs.writeFile(file, updatedXml, 'utf8', (err) => {
                 if (err) {
-                    logs_error("[XML]".bgRed,'Error writing the file:', err);
+                    logs_error("[XML]".bgRed,'Error parsing XML:', err);
                     return;
                 }
-                actionmapsStore.set('actionmaps',updatedXml)
-                logs("[XML]".bgGreen,"XML Built");
-            });
+            
+                // Find the actionmap with the name 'spaceship_movement' ActionMaps.ActionProfiles[0].actionmap.
+                const actionmap = result.ActionMaps.ActionProfiles[0].actionmap.find(am => am.$.name === 'spaceship_movement');
+                // console.log(actionmap)
+                if (!actionmap) {
+                    logs_error("[XML]".bgRed,'spaceship_movement actionmap not found.');
+                    return;
+                }
+            
+                // Check if the actions v_yaw and v_pitch are present
+                const actions = actionmap.action || [];
+                const vYawAction = actions.find(a => a.$.name === 'v_yaw');
+                const vPitchAction = actions.find(a => a.$.name === 'v_pitch');
+    
+                // Add missing actions
+                if (!vYawAction) {
+                    actions.push({
+                    $: { name: 'v_yaw' },
+                    rebind: [{ $: { input: 'js2_x' } }]
+                    });
+                }
+            
+                if (!vPitchAction) {
+                    actions.push({
+                    $: { name: 'v_pitch' },
+                    rebind: [{ $: { input: 'js2_y' } }]
+                    });
+                }
+            
+                // Update the actionmap actions
+                actionmap.action = actions;
+
+                // Build the updated XML
+                const builder = new xml2js.Builder();
+                const updatedXml = builder.buildObject(result);
+            
+                // Write the updated XML back to the file
+                fs.writeFile(file, updatedXml, 'utf8', (err) => {
+                    if (err) {
+                        logs_error("[XML]".bgRed,'Error writing the file:', err);
+                        return;
+                    }
+                    actionmapsStore.set('actionmaps',result)
+                    logs("[XML]".bgGreen,"XML Built");
+                });
             });
         });
     },

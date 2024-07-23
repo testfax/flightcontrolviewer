@@ -343,7 +343,7 @@ try {
   //Emitter is in dashboard.js
   //Waits for the renderer to initialize the UI before accepting data from the device.
   ipcMain.on('initializer-response', (event,message) => { 
-    logs("[RENDERER-Init]".bgMagenta,message)
+    logs("[RENDERER-Init]".bgGreen,message)
     deviceSetup[message] = 2
   })
 }
