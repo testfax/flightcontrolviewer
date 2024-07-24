@@ -180,7 +180,7 @@ try {
         if (deviceSetup[jsId] == 0) { initializeUI(buttonArray.bufferDecoded,requestedDevices,"from_brain-detection-initialize",); deviceSetup[jsId] = 1 }
         const handleData = throttle((data) => {
           const byteArray = analyzeBuffer(data)
-  
+          
           //TODO Detect axis travel some how to get median distance
           let medianDistance = 30000
           if (foundDevices[jsId].vendorId == 13124) { //virpil shows median on all x,y,z,z(pedals) devices as 30000
