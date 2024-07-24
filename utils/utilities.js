@@ -63,14 +63,14 @@ const util = {
                 if (!vYawAction) {
                     actions.push({
                     $: { name: 'v_yaw' },
-                    rebind: [{ $: { input: 'js2_x' } }]
+                    rebind: [{ $: { input: 'js1_x' } }]
                     });
                 }
             
                 if (!vPitchAction) {
                     actions.push({
                     $: { name: 'v_pitch' },
-                    rebind: [{ $: { input: 'js2_y' } }]
+                    rebind: [{ $: { input: 'js1_y' } }]
                     });
                 }
             
