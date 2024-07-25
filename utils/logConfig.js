@@ -166,6 +166,16 @@ try {
                 }
             }).join(' ');
             log.error(logMessage)
+        },
+        logs_debug: async (...input) => {
+            let logMessage = input.map(item => {
+                if (typeof item === 'object') {
+                    return colorizeJSON(JSON.stringify(item, null, 2));
+                } else {
+                    return item;
+                }
+            }).join(' ');
+            log.debug(logMessage)
         }
     };
     module.exports = logsUtil;

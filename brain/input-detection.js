@@ -1,4 +1,4 @@
-const { logs, logs_error } = require('../utils/logConfig')
+const { logs, logs_error, logs_debug } = require('../utils/logConfig')
 try {
   const throttle = require('lodash.throttle');
   const { blastToUI } = require('../brain/input-functions')
@@ -180,7 +180,7 @@ try {
         if (deviceSetup[jsId] == 0) { initializeUI(buttonArray.bufferDecoded,requestedDevices,"from_brain-detection-initialize",); deviceSetup[jsId] = 1 }
         const handleData = throttle((data) => {
           const byteArray = analyzeBuffer(data)
-          
+
           //TODO Detect axis travel some how to get median distance
           let medianDistance = 30000
           if (foundDevices[jsId].vendorId == 13124) { //virpil shows median on all x,y,z,z(pedals) devices as 30000
@@ -210,7 +210,7 @@ try {
               gripAxis_current = virpil_pedal_distance
               if (!virpil_pedal_movementDetected && gripAxis_current !== medianDistance) {
                 virpil_pedal_movementDetected = true
-                if (showConsoleMessages) { logs(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer.detection, result_processAxisBuffer) }
+                if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer.detection, result_processAxisBuffer) }
                 if (deviceSetup[jsId] == 2) {
                   package.keybindArray = findKeybind(`${requestedDevices.position}_${result_processAxisBuffer.detection}`,actionmaps.get('discoveredKeybinds'))
                   blastToUI(package) 
@@ -226,14 +226,14 @@ try {
               && !device_virpil_pedals
             ) {
               if (foundDevices[jsId].vendorId == 13124) {
-                if (showConsoleMessages) { logs(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer);}
+                if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer);}
                 if (deviceSetup[jsId] == 2) {
                   package.keybindArray = findKeybind(`${requestedDevices.position}_${gripAxis_current}`,actionmaps.get('discoveredKeybinds'))
                   blastToUI(package) 
                 }
               }
               else {
-                if (showConsoleMessages) { logs(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer);}
+                if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer);}
                 if (deviceSetup[jsId] == 2) {
                   package.keybindArray = findKeybind(`${requestedDevices.position}_${gripAxis_current}`,actionmaps.get('discoveredKeybinds'))
                   blastToUI(package) 
@@ -261,7 +261,7 @@ try {
               if (foundDevices[jsId].vendorId == 13124) { //virpil buttons 1 through 5 have a lever(button3) that can actuate 2 different states. However, star citizen does not recognize the lever(button3) as a button+button combo.
                 switch (gripHandle_current) {
                   case 'button1':
-                    if (showConsoleMessages) { logs(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
+                    if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
                       gripHandle_grip = gripHandle_current;
                       if (deviceSetup[jsId] == 2) {
                         package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
@@ -270,7 +270,7 @@ try {
                       break;
                   case 'button2':
                       if (gripHandle_flip != 3) { 
-                        if (showConsoleMessages) { logs(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
+                        if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
                         if (deviceSetup[jsId] == 2) {
                           package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
                           blastToUI(package) 
@@ -281,7 +281,7 @@ try {
                       break;
                   case 'button3':
                       if (gripHandle_flip == 2 || gripHandle_flip == 4) { 
-                        if (showConsoleMessages) { logs(`${jsId.toUpperCase()} Button:`,result_processButtonBuffer)  }
+                        if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`,result_processButtonBuffer)  }
                         if (deviceSetup[jsId] == 2) {
                           package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
                           blastToUI(package) 
@@ -290,7 +290,7 @@ try {
                       gripHandle_flip = 3; 
                       break;
                   case 'button4':
-                    if (showConsoleMessages) { logs(`${jsId.toUpperCase()} Button:`,result_processButtonBuffer) }
+                    if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`,result_processButtonBuffer) }
                       gripHandle_flip = 4;
                       if (deviceSetup[jsId] == 2) {
                         package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
@@ -298,7 +298,7 @@ try {
                       }
                       break;
                   case 'button5':
-                    if (showConsoleMessages) { logs(`${jsId.toUpperCase()} Button:`,result_processButtonBuffer) }
+                    if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`,result_processButtonBuffer) }
                       gripHandle_flip = 5;
                       if (deviceSetup[jsId] == 2) {
                         package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
@@ -306,7 +306,7 @@ try {
                       }
                       break;
                   default:
-                    if (showConsoleMessages) { logs(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
+                    if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
                       if (deviceSetup[jsId] == 2) {
                         package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
                         blastToUI(package) 
@@ -315,7 +315,7 @@ try {
               }
               }
               else {
-                if (showConsoleMessages) { logs(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
+                if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
                 gripHandle_grip = gripHandle_current
                 if (deviceSetup[jsId] == 2) {
                   package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
@@ -330,10 +330,10 @@ try {
           }
         }, 100) //! Throttled for 100ms. Only processes if the buffer is different than last check
         device.on('data', handleData);
-        device.on('error', err => { logs_error(`Joystick ${jsId.replace(/^js/,'')} error:`, err) })
+        device.on('error', err => { logs_error(`Joystick ${jsId.replace(/^js/,'')} error:`, err.stack) })
       }
       catch (e) {
-        logs_error(e)
+        logs_error(e.stack)
       }
     }
   })
@@ -343,10 +343,10 @@ try {
   //Emitter is in dashboard.js
   //Waits for the renderer to initialize the UI before accepting data from the device.
   ipcMain.on('initializer-response', (event,message) => { 
-    logs("[RENDERER-Init]".bgGreen,message)
+    logs_debug("[RENDERER-Init]".bgGreen,message)
     deviceSetup[message] = 2
   })
 }
 catch (error) {
-  logs_error(error,error.name)
+  logs_error(error.stack)
 }

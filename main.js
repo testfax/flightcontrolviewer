@@ -1,4 +1,4 @@
-const {logs,logs_error} = require('./utils/logConfig')
+const {logs,logs_error,logs_debug} = require('./utils/logConfig')
 
 if (logs) { main(); }
 function main() {

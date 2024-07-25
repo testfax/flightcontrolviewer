@@ -1,56 +1,44 @@
 const { app, BrowserWindow } = require('electron')
-const {logs,logs_error} = require('./logConfig')
+const {logs,logs_error,logs_debug} = require('./logConfig')
 const Store = require('electron-store');
 const store = new Store({ name: 'electronWindowIds'})
 const path = require('path')
 const fs = require('fs')
 const colors = require('colors')
-
+const windowItemsStore = new Store({ name: 'electronWindowIds'})
+const showConsoleMessages = windowItemsStore.get('showConsoleMessages')
 const xml2js = require('xml2js');
 
 const util = {
     convertXML: async(path) => {
         try {
-            logs("[XML]".bgYellow,"Reading actionsmap.xml")
-            const xmlArray = fs.readFileSync(path,'utf8', (err,data) => { if (err) return logs_error("[XML]".bgRed,err); return data });
-            
+            if (showConsoleMessages) { logs_debug("[XML]".bgYellow,"Reading actionsmap.xml") }
+            const xmlArray = fs.readFileSync(path,'utf8', (err,data) => { if (err) return logs_error("[XML]".bgRed,err.stack); return data });
+            const XMLfile_path = util.client_path().rsi_actionmaps
+            const xmlFile = fs.readFileSync(XMLfile_path,'utf8', (err,data) => { if (err) return logs_error("[XML]".bgRed,err.stack); return data });
             const parser = new xml2js.Parser({ explicitArray: false })
             let jsonResult = null;
-            parser.parseString(xmlArray, (error, result) => {
+            parser.parseString(xmlArray, (error, xmlFile) => {
                 if (error) throw error
-                else { jsonResult = result }
+                else { jsonResult = xmlFile }
             })
             const actionmapsStore = new Store({ name: 'actionmapsJSON'})
-            actionmapsStore.set('actionmaps',jsonResult.ActionMaps)
-            util.buildXML()
-        }
-        catch (e) {
-            logs_error("[XML]".bgRed,e);
-        }
-    },
-    buildXML: async() => {
-        const file = util.client_path().rsi_actionmaps
-        const actionmapsStore = new Store({ name: 'actionmapsJSON'})
-        
-        logs("[XML]".bgYellow,"Building actionsmap.xml")
-        // Read the actionmaps.xml file
-        fs.readFile(file, 'utf8', (err, data) => {
-            if (err) {
-                logs_error("[XML]".bgRed,'Error reading the file:', err);
-                return;
-            }
+            
+            if (showConsoleMessages) { logs_debug("[XML]".bgYellow,"Building actionsmap.xml") }
+
             // Parse the XML data
-            xml2js.parseString(data, (err, result) => {
+            let returnables = null
+            xml2js.parseString(xmlFile, (err, xmlFile_data) => {
                 if (err) {
-                    logs_error("[XML]".bgRed,'Error parsing XML:', err);
+                    logs_error("[XML]".bgRed,'Error parsing XML:', err.stack);
                     return;
                 }
             
                 // Find the actionmap with the name 'spaceship_movement' ActionMaps.ActionProfiles[0].actionmap.
-                const actionmap = result.ActionMaps.ActionProfiles[0].actionmap.find(am => am.$.name === 'spaceship_movement');
+                const actionmap = xmlFile_data.ActionMaps.ActionProfiles[0].actionmap.find(am => am.$.name === 'spaceship_movement')
                 // console.log(actionmap)
                 if (!actionmap) {
-                    logs_error("[XML]".bgRed,'spaceship_movement actionmap not found.');
+                    logs_error("[XML]".bgRed,'spaceship_movement actionmap not found.')
                     return;
                 }
             
@@ -79,26 +67,28 @@ const util = {
 
                 // Build the updated XML
                 const builder = new xml2js.Builder();
-                const updatedXml = builder.buildObject(result);
-            
+                const updatedXml = builder.buildObject(xmlFile_data);
+                actionmapsStore.set('actionmaps',xmlFile_data)
+
                 // Write the updated XML back to the file
-                fs.writeFile(file, updatedXml, 'utf8', (err) => {
-                    if (err) {
-                        logs_error("[XML]".bgRed,'Error writing the file:', err);
-                        return;
-                    }
-                    actionmapsStore.set('actionmaps',result)
-                    logs("[XML]".bgGreen,"XML Built");
-                });
+
+                const writen = fs.writeFileSync(XMLfile_path, updatedXml, 'utf8')//, (err,data) => { if (err) return logs_error("[XML]".bgRed,err.stack); return data });
+                if (showConsoleMessages) { logs_debug("[XML]".bgGreen,"XML Built") }
+                returnables = writen == writen ? true : false
+                return returnables
             });
-        });
+            return returnables
+        }
+        catch (e) {
+            logs_error("[XML]".bgRed,e.stack)
+        }
     },
     cwd: app.isPackaged ? path.join(process.cwd(),'resources','app') : process.cwd(),
     autoUpdater: async () => {
         // Auto Updater
         if (app.isPackaged) { 
             const { autoUpdater } = require('electron-updater')
-            logs("Running Auto-Updater Functions".yellow)
+            logs_debug("Running Auto-Updater Functions".yellow)
             autoUpdater.logger = require('electron-log')
             autoUpdater.checkForUpdatesAndNotify();
 
@@ -124,7 +114,7 @@ const util = {
                     win.setTitle(`Flight Control Viewer - ${JSON.stringify(app.getVersion())} - ${JSON.stringify(info.version)} Update Available, download pending... please wait...`)
                 })
                 autoUpdater.on('update-not-available',(info)=>{
-                    // logs(`-AU update-not-available: ${JSON.stringify(info)}`)
+                    // logs_debug(`-AU update-not-available: ${JSON.stringify(info)}`)
                 })
                 autoUpdater.on('update-downloaded',(info)=>{
                 dialog.showMessageBox({
@@ -173,7 +163,7 @@ const util = {
     },
     client_path: function(request) {
         // if (util.watcherConsoleDisplay('client_path') && request) {
-        //     logs("[UTIL]".green,"client_path:".blue,request);
+        //     logs_debug("[UTIL]".green,"client_path:".blue,request);
         // }
         let rsi_stockLocation = path.join('C:','Program Files','Roberts Space Industries','StarCitizen','LIVE')
         let rsi_path = path.normalize(rsi_stockLocation)
