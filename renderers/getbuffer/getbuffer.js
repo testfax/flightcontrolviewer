@@ -108,49 +108,16 @@ async function clickedEvent(evt) {
       // }
     }
     else {
-      drop(clickedEvent[0],'dashboard') //review function for HTML class requirements.
+      drop(clickedEvent[0],'getbuffer') //review function for HTML class requirements.
     }
 }
 
-
-ipcRenderer.on('from_brain-detection', (package) => {
-  const changeButton = document.getElementById(`${package.deviceInfo.position}_${package.data.ind}_assignment`)
-  let bindStack = []
-  if (package.keybindArray != 0) { 
-    package.keybindArray.forEach(item => {
-      bindStack.push({ [item.categoryName] : { "action": item.actions[0] } })
-    })
-    console.log("STACK:",bindStack)
-    let screenReady = '';
-    bindStack.forEach(item => {
-      for (let category in item) {
-        screenReady += `CAT: ${category}\n`;
-        screenReady += `- ACTION: ${item[category].action}\n`;
-      }
-    })
-    changeButton.innerText = screenReady
-  }
-  else {
-    changeButton.innerText = package.data.detection
-  }
-
-
-  let allColors = document.getElementsByClassName(`currentButton_${package.deviceInfo.position}`)
-
-  if (allColors.length > 0) {
-    Array.from(allColors).forEach(item => {
-      if (item.classList.contains(`currentButton_${package.deviceInfo.position}`)) {
-        item.classList.remove(`currentButton_${package.deviceInfo.position}`)
-        item.classList.remove('font-BLOCKY-green')
-        item.classList.add('w3-text-orange')
-      }
-    })
-  }
-  changeButton.classList.remove(`w3-text-orange`)
-  changeButton.classList.add('font-BLOCKY-green')
-  changeButton.classList.add(`currentButton_${package.deviceInfo.position}`)
+ipcRenderer.on('from_brain-detection-getbuffer', (package) => {
+  package.data.forEach((ind,index) => {
+    document.getElementById(`${package.deviceInfo.position}_${index}_assignment`).innerText = ind
+  })
 })
-ipcRenderer.on('from_brain-detection-initialize', (package) => {
+ipcRenderer.on('from_brain-detection-initialize-getbuffer', (package) => {
   document.getElementById(`${package.deviceInfo.position}_position`).innerText = package.deviceInfo.product
   const container = document.getElementById(`${package.deviceInfo.position}bar_container`)
   let dynamicDom = document.getElementsByClassName(`${package.deviceInfo.position}_DynamicDom`)
@@ -173,7 +140,7 @@ ipcRenderer.on('from_brain-detection-initialize', (package) => {
       TH2.setAttribute('class',`${package.deviceInfo.position}_DynamicDom font-BLOCKY w3-text-orange`)
       TH2.setAttribute('id',`${package.deviceInfo.position}_${index}_slot`)
       TH2.innerText = slot
-  
+
       const TH3 = document.createElement('th')
       newTR.appendChild(TH3)
       TH3.setAttribute('class',`${package.deviceInfo.position}_DynamicDom font-BLOCKY w3-text-orange`)

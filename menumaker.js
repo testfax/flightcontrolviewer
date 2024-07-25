@@ -1,18 +1,25 @@
 const {Menu, BrowserWindow, ipcMain} = require('electron')
-const {logs,logs_error} = require('./utils/logConfig')
-const { autoUpdater, cwd, errorHandler } = require('./utils/utilities')
+const {logs,logs_error, logs_debug} = require('./utils/logConfig')
+const { autoUpdater, cwd } = require('./utils/utilities')
 const Store = require('electron-store');
 const store = new Store({ name: 'electronWindowIds'})
 const path = require('path')
 const fs = require('fs')
 const links = {
     dashboard: async function() {
-        BrowserWindow.fromId(2).loadURL(`file://${path.join(cwd, 'renderers/dashboard/dashboard.html')}`)
-        pageData.currentPage = "Dashboard"
-        store.set('currentPage',pageData.currentPage)
+        store.set('currentPage','dashboard')
+        ipcMain.emit(event,data)
+        BrowserWindow.fromId(1).loadURL(`file://${path.join(cwd, 'renderers/dashboard/dashboard.html')}`)
+        ipcMain.emit('changePage','change')
+    },
+    getbuffer: async function() {
+        store.set('currentPage','getbuffer')
+        BrowserWindow.fromId(1).loadURL(`file://${path.join(cwd, 'renderers/getbuffer/getbuffer.html')}`)
+        ipcMain.emit('changePage','change')
     },
     checkForUpdates: async function() {
         try {
+            ipcMain.emit('changePage','change')
             autoUpdater()
         }
         catch (e) {
@@ -49,6 +56,21 @@ const template = [
         label: 'Dashboard',
         // click: ()=>{links.statistics();} 
         click: ()=>{links.dashboard()}
+        // submenu: [
+        //     {
+        //         label: 'Sampling',
+        //         click: ()=>{links.sampling()}
+        //     },
+        //     // {
+        //     //     label: 'Test',
+        //     //     click: ()=>{links.test()}
+        //     // }
+        // ]
+    },
+    {
+        label: 'Get Buffer',
+        // click: ()=>{links.statistics();} 
+        click: ()=>{links.getbuffer()}
         // submenu: [
         //     {
         //         label: 'Sampling',

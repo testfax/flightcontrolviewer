@@ -134,7 +134,7 @@ function main() {
         module.exports = { win, cwd }
       }
       catch(e) {
-        logs("failed to load load window",e)
+        logs_error("failed to load load window",e)
         return
       }
     }
