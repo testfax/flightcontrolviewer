@@ -433,6 +433,4 @@ try {
     deviceSetup[message] = 2
   })
 }
-catch (error) {
-  logs_error("[ERROR]".red,error.stack)
-}
+catch (error) { logs_error("[ERROR]".red,error.stack) }
