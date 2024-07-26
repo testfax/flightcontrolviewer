@@ -30,8 +30,7 @@ try {
     let detection = false;
     let ind = null;
     let val = null;
-   
-    
+    let build = null
     const joystickAxisNames = {
       1: 'x',
       3: 'y',
@@ -41,9 +40,26 @@ try {
       11: 'z'
     };
     const joystickAxes = [1, 3, 5, 7, 11];
+    //For Virpil
+    try {
+      const sliderIndex = 9;
+      const sliderValue = buffer[sliderIndex];
+      if (sliderValue !== undefined && sliderValue > 30000) {
+        detection = "slider";
+        ind = Object.entries(buttonArray).findIndex(([key, value]) => key === detection)
+        bufferVals.slider_val = sliderValue
+        bufferVals.slider = detection == 'slider' ? (bufferVals.slider_val >= 30000) : false
+        bufferVals['slider_detection'] = "slider"
+        bufferVals['slider_ind'] = ind
+        build = { "detection":detection, "ind":bufferVals[detection + '_ind'] }
+        if (showConsoleMessages) { console.log(sliderIndex,bufferVals[detection],"HIT".red,jsId,'BID'.blue,detection) }
+        return build
+      }
+    }
+    catch (e) {
+      console.log(e)
+    }
     //
-
-
     joystickAxes.forEach(index => {
       const bufferValue = buffer[index]
       if (bufferValue !== undefined && bufferValue !== medianDistance) {
@@ -64,37 +80,20 @@ try {
           let state = false;
           if (input >= buffValHi) { state = true }
           if (input <= buffValLo) { state = true }
-          // console.log("input",input)
           bufferVals[axisName] = state
-          // console.log(index,bufferVals[axisName],"HIT".red,jsId,'BID'.blue,axisName)
+          bufferVals[axisName + '_detection'] = axisName
+          bufferVals[axisName + '_ind'] = ind
+          if (state) { 
+            if (showConsoleMessages) { console.log(index,bufferVals[axisName],"HIT".red,jsId,'BID'.blue,axisName) }
+            build = { "detection":axisName, "ind":bufferVals[axisName + '_ind'] }
+            return { build }
+          }
         }
         //
         //vor Virpil
       }
     })
-  
-    //For Virpil
-    const sliderIndex = 9;
-    const sliderValue = buffer[sliderIndex];
-    if (sliderValue !== undefined && sliderValue > 100) {
-      detection = "slider";
-      ind = Object.entries(buttonArray).findIndex(([key, value]) => key === detection)
-      bufferVals.slider_val = sliderValue
-      bufferVals.slider = detection == 'slider' ? (bufferVals.slider_val >= 40000) : false
-    }
-    //
-
-
-
-    // if (joystickAxes.every(index => buffer[index] === medianDistance) || sliderIndex == 0) {
-    //   bufferVals.x_moved = false
-    //   bufferVals.y_moved = false
-    //   bufferVals.z_moved = false
-    //   bufferVals.slider_moved = false
-    // }
-    if (detection) {
-      return { detection, ind, val, bufferVals }
-    }
+    return build
   }
   function virpil_processButtonBuffer(buffer,buttonArray) { //FOR VIRPIL
     let detection = false;
@@ -129,24 +128,20 @@ try {
     return byteArray
   }
   function findKeybind(key,discoveredKeybinds) {
-    if (showConsoleMessages) { console.log("[findKeyBind]".yellow,key)}
-    if (key in discoveredKeybinds) { return discoveredKeybinds[key] } 
-    else { return 0 }
+    // if (showConsoleMessages) { console.log("[findKeyBind]".yellow,discoveredKeybinds) }
+    if (showConsoleMessages) { console.log("[findKeyBind]".yellow,key) }
+    if (key in discoveredKeybinds) { 
+      if (showConsoleMessages) { console.log("[findKeyBind]".green, discoveredKeybinds[key]) }
+      return discoveredKeybinds[key] 
+    } 
+    else { 
+      if (showConsoleMessages) { console.log("[findKeyBind]".red, key) }
+      return 0 
+    }
   }
 
   //!Startup Variables!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   let devices = HID.devices()
-  // const uniqueDevices = Array.from(new Map(devices
-  //   .filter(device => device.product !== '')
-  //   .map(device => [device.product, device])))
-  //   .map(([key, value]) => value);
-  // const deviceList = uniqueDevices.map(i=> ({
-  //   product: i.product,
-  //   productId: i.productId,
-  //   vendorId: i.vendorId
-  // }))
-  // actionmaps.set('deviceList',deviceList)
-
   /**
    * @JSON
    * Get the devices from the user setup.
@@ -198,13 +193,24 @@ try {
     rX: false,
     rY: false,
     slider: false,
+    x_detection: null,
+    y_detection: null,
+    z_detection: null,
+    slider_detection: null,
+    rX_detection: null,
+    rY_detection: null,
+    x_ind: null,
+    y_ind: null,
+    z_ind: null,
+    rY_ind: null,
+    rX_ind: null,
   }
   ZeroDeviceSetup(deviceSetup,foundDevices,devicesRequested,deviceInit,bufferVals)
   function ZeroDeviceSetup(deviceSetup,foundDevices,devicesRequested,deviceInit,bufferVals) {
     for (const key of Object.keys(foundDevices)) { deviceSetup[key] = 0 }
-    const keys = Object.keys(foundDevices);
+    const keys = Object.keys(foundDevices)
     keys.forEach(jsId => {
-      if (foundDevices[jsId] != undefined) { 
+      if (foundDevices[jsId] != undefined) {
         try {
           // logs(jsId)
           // logs(foundDevices[jsId])
@@ -218,7 +224,6 @@ try {
           let gripHandle_flip = null
           let gripAxis_current = null
           let gripAxis_previous = 'derp'
-          let gripBuffer_current = null
           let virpil_pedal_movementDetected = false
           let virpil_pedal_distance = null
           const requestedDevices = devicesRequested[jsId]
@@ -254,16 +259,15 @@ try {
               const device_virpil_pedals = foundDevices[jsId].vendorId == 13124 && foundDevices[jsId].productId == 505
               let result_processAxisBuffer = null;
               if (!device_virpil_pedals) {
-                
                 result_processAxisBuffer = processAxisBuffer(byteArray,buttonArray.bufferDecoded,medianDistance,bufferVals,jsId)
               }
-             
+
               //!virpil VPC ACE-Torq Rudder (START)
               try {
                 if (device_virpil_pedals) {
                   virpil_pedal_distance = byteArray[1] //buffer value between 0-30000 (left pedal) and 30000-60000 (right pedal)
                   const virpil_processAxisBuffer = { detection: 'z', ind: 0, val: virpil_pedal_distance }
-                  if (!virpil_pedal_movementDetected 
+                  if (!virpil_pedal_movementDetected
                     && virpil_pedal_distance !== medianDistance
                   ) {
                     virpil_pedal_movementDetected = true
@@ -271,7 +275,7 @@ try {
                     if (deviceSetup[jsId] == 2) {
                       const package = {
                         keybindArray: null,
-                        data: result_processAxisBuffer,
+                        data: virpil_processAxisBuffer,
                         deviceInfo: requestedDevices,
                         receiver: "from_brain-detection",
                         keybindArticulation: keybindArticulation.keybindArticulation
@@ -279,7 +283,7 @@ try {
                       package.keybindArray = findKeybind(`${requestedDevices.position}_${virpil_processAxisBuffer.detection}`,actionmaps.get('discoveredKeybinds'))
                       blastToUI(package)
                     }
-                  } 
+                  }
                   else if (virpil_pedal_movementDetected && virpil_pedal_distance === medianDistance) {
                     virpil_pedal_movementDetected = false
                   }
@@ -298,42 +302,38 @@ try {
                   receiver: "from_brain-detection",
                   keybindArticulation: keybindArticulation.keybindArticulation
                 }
-                
-                // console.log(`Key: Y", Value: ${bufferVals.y_val} ${bufferVals.y}`,`Key: X", Value: ${bufferVals.x_val} ${bufferVals.x}`)
-                // console.log(gripAxis_current,gripAxis_previous)
-                Object.entries(bufferVals).forEach(([key, value]) => {
-                  if (value == true) { 
-                    // console.log(`Key: ${key}, Value: ${value}`)
-                    gripBuffer_current = key
-                    gripAxis_current = key
-                  }
-                })
-                if (!device_virpil_pedals
-                  && (bufferVals.x || bufferVals.y || bufferVals.z || bufferVals.slider || bufferVals.rX || bufferVals.rY)
-                  && (gripAxis_current != gripAxis_previous)
-                ) {
-                  
-                  if (foundDevices[jsId].vendorId == 13124) {
-                    if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer) }
-                    if (deviceSetup[jsId] == 2) {
-                      package.keybindArray = findKeybind(`${requestedDevices.position}_${gripBuffer_current}`,actionmaps.get('discoveredKeybinds'))
-                      blastToUI(package)
+                try {
+                  gripAxis_current = package.data.detection
+                  if (!device_virpil_pedals
+                    && (bufferVals.x || bufferVals.y || bufferVals.z || bufferVals.slider || bufferVals.rX || bufferVals.rY)
+                    && (gripAxis_current != gripAxis_previous)
+                  ) {
+                    // package.data = buffer_current
+                    if (foundDevices[jsId].vendorId == 13124) {
+                      if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer) }
+                      if (deviceSetup[jsId] == 2) {
+                        package.keybindArray = findKeybind(`${requestedDevices.position}_${package.data.detection}`,actionmaps.get('discoveredKeybinds'))
+                        blastToUI(package)
+                      }
                     }
-                  }
-                  else {
-                    if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer) }
-                    if (deviceSetup[jsId] == 2) {
-                      package.keybindArray = findKeybind(`${requestedDevices.position}_${gripBuffer_current}`,actionmaps.get('discoveredKeybinds'))
-                      blastToUI(package)
+                    else {
+                      if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer) }
+                      if (deviceSetup[jsId] == 2) {
+                        package.keybindArray = findKeybind(`${requestedDevices.position}_${package.data.detection}`,actionmaps.get('discoveredKeybinds'))
+                        blastToUI(package)
+                      }
                     }
+                    gripAxis_previous = gripAxis_current
                   }
-                  gripAxis_previous = gripAxis_current
+                }
+                catch (e) {
+                  console.log(e)
                 }
               }
               //! BUTTON
               const result_processButtonBuffer = virpil_processButtonBuffer(byteArray,buttonArray.bufferDecoded)
               if (result_processButtonBuffer) {
-                gripHandle_current = result_processButtonBuffer.detection;
+                gripHandle_current = result_processButtonBuffer.detection
                 if (
                     gripHandle_current !== gripHandle_previous 
                   && gripHandle_current !== gripHandle_grip
@@ -400,7 +400,7 @@ try {
                             blastToUI(package) 
                           }
                           break;
-                  }
+                    }
                   }
                   else {
                     if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
@@ -412,7 +412,7 @@ try {
                   }
                   
                   // Update previous state to current after processing
-                  gripHandle_previous = gripHandle_current;
+                  gripHandle_previous = gripHandle_current
                 }
                 
               }
@@ -420,9 +420,7 @@ try {
           }, 100) //! Throttled for 100ms. Only processes if the buffer is different than last check
           device.on('data', handleData)
           device.on('error', err => { logs_error(`Joystick ${jsId.replace(/^js/,'')} error:`, err.stack) })
-          device.on('stop-listeners', () => {
-            device.removeAllListeners()
-          })
+          device.on('stop-listeners', () => { device.removeAllListeners() })
         }
         catch (e) {
           logs_error(e.stack)

@@ -121,22 +121,33 @@ ipcRenderer.on('from_brain-detection', (package) => {
     let bindStack = []
     if (package.keybindArray != 0) { 
       package.keybindArray.forEach(item => {
-        bindStack.push({ [item.categoryName] : { "action": item.actions[0] } })
+        item.actions.forEach(act => {
+          bindStack.push({ [item.categoryName] : { "action": act } })
+        })
       })
-      // console.log("STACK:",package.data)
       let screenReady = ''
+      const groupedActions = {}
       bindStack.forEach(item => {
         for (let category in item) {
-          if (package.keybindArticulation) {
-            let cat = package.keybindArticulation.categories[category]
-            let act = package.keybindArticulation.actions[item[category].action]
-            if (cat) { screenReady += `${cat}\n` }
-            else { screenReady += `${package.detection} CAT: ${category}\n` }
-            if (act) { screenReady += `-> ${act}\n` }
-            else { screenReady += `- ACTION: ${item[category].action}\n` }
+          if (!groupedActions[category]) {
+            groupedActions[category] = []
           }
+          groupedActions[category].push(item[category].action)
         }
       })
+      for (let category in groupedActions) {
+        if (package.keybindArticulation) {
+          let cat = package.keybindArticulation.categories[category]
+          if (cat) { screenReady += `${cat}\n` } 
+          else { screenReady += `${package.detection} CAT: ${category}\n` }
+          groupedActions[category].forEach(action => {
+            let act = package.keybindArticulation.actions[action]
+            if (act) { screenReady += `-> ${act}\n` } 
+            else { screenReady += `- ACTION: ${action}\n` }
+          })
+        }
+      }
+      // console.log(screenReady)
       changeButton.innerText = screenReady
       changeButton2.innerText = screenReady
       title.innerText = package.deviceInfo.product + ` «» ` + package.data.detection.toUpperCase()
@@ -144,6 +155,7 @@ ipcRenderer.on('from_brain-detection', (package) => {
     else {
       changeButton.innerText = package.data.detection
       changeButton2.innerText = package.data.detection
+      title.innerText = package.deviceInfo.product + ` «» ` + package.data.detection.toUpperCase()
     }
     let allColors = document.getElementsByClassName(`currentButton_${package.deviceInfo.position}`)
     if (allColors.length > 0) {
