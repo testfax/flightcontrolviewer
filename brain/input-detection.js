@@ -7,7 +7,6 @@ try {
   const Store = require('electron-store');
   const windowItemsStore = new Store({ name: 'electronWindowIds'})
   const actionmaps = new Store({ name: 'actionmapsJSON'})
-  const deviceBufferDecode = new Store({ name: 'deviceBufferDecode'})
   const deviceStateData = new Store({ name: "deviceInfo" });
   const thisWindow = windowItemsStore.get('electronWindowIds')
   // const showConsoleMessages = 1
