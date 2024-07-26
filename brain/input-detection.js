@@ -26,11 +26,12 @@ try {
       else { logs_error("no client") }
     }
   }
-  function processAxisBuffer(buffer,buttonArray,medianDistance,hasMoved) {
+  function processAxisBuffer(buffer,buttonArray,medianDistance,bufferVals,jsId) {
     let detection = false;
     let ind = null;
-
-    //vor Virpil
+    let val = null;
+   
+    
     const joystickAxisNames = {
       1: 'x',
       3: 'y',
@@ -44,34 +45,55 @@ try {
 
 
     joystickAxes.forEach(index => {
-      const bufferValue = buffer[index];
+      const bufferValue = buffer[index]
       if (bufferValue !== undefined && bufferValue !== medianDistance) {
         const axisName = joystickAxisNames[index];
         detection = axisName;
-        ind = Object.entries(buttonArray)
-        .findIndex(([key, value]) => key === axisName);
-        hasMoved = true
+        ind = Object.entries(buttonArray).findIndex(([key, value]) => key === axisName)
+        val = buffer[index]
+        //For Virpil, sets a distance value away from center that the stick must move before it is triggered in the app.
+        // Helps for when you're pushing buttons and not have an Axis show up
+        const buffValHi = 40000
+        const buffValLo = 20000
+        if (axisName == 'x') { bufferVals.x_val = val; checker(bufferVals.x_val) }
+        if (axisName == 'y') { bufferVals.y_val = val; checker(bufferVals.y_val) }
+        if (axisName == 'z') { bufferVals.z_val = val; checker(bufferVals.z_val) }
+        if (axisName == 'rY') { bufferVals.rY_val = val; checker(bufferVals.rY_val) }
+        if (axisName == 'rX') { bufferVals.rX_val = val; checker(bufferVals.rX_val) }
+        function checker(input) {
+          let state = false;
+          if (input >= buffValHi) { state = true }
+          if (input <= buffValLo) { state = true }
+          // console.log("input",input)
+          bufferVals[axisName] = state
+          // console.log(index,bufferVals[axisName],"HIT".red,jsId,'BID'.blue,axisName)
+        }
+        //
+        //vor Virpil
       }
     })
   
     //For Virpil
     const sliderIndex = 9;
     const sliderValue = buffer[sliderIndex];
-    if (sliderValue !== undefined && sliderValue > 0) {
+    if (sliderValue !== undefined && sliderValue > 100) {
       detection = "slider";
-      ind = ind = Object.entries(buttonArray)
-      .findIndex(([key, value]) => key === detection);
-      hasMoved = true
+      ind = Object.entries(buttonArray).findIndex(([key, value]) => key === detection)
+      bufferVals.slider_val = sliderValue
+      bufferVals.slider = detection == 'slider' ? (bufferVals.slider_val >= 40000) : false
     }
     //
 
 
 
-    if (joystickAxes.every(index => buffer[index] === medianDistance)) {
-      hasMoved = false;
-    }
+    // if (joystickAxes.every(index => buffer[index] === medianDistance) || sliderIndex == 0) {
+    //   bufferVals.x_moved = false
+    //   bufferVals.y_moved = false
+    //   bufferVals.z_moved = false
+    //   bufferVals.slider_moved = false
+    // }
     if (detection) {
-      return { detection, ind }
+      return { detection, ind, val, bufferVals }
     }
   }
   function virpil_processButtonBuffer(buffer,buttonArray) { //FOR VIRPIL
@@ -158,13 +180,27 @@ try {
     deviceInit.forEach(device => device.removeAllListeners())
     setTimeout(() => {
         if (showConsoleMessages) { logs_debug("[RENDERER]".bgGreen,"Page Change:".yellow,windowItemsStore.get('currentPage')) }
-        ZeroDeviceSetup(deviceSetup,foundDevices,devicesRequested,deviceInit)
+        ZeroDeviceSetup(deviceSetup,foundDevices,devicesRequested,deviceInit,bufferVals)
     },300)
   })
   let deviceInit = []
   const deviceSetup = {}
-  ZeroDeviceSetup(deviceSetup,foundDevices,devicesRequested,deviceInit)
-  function ZeroDeviceSetup(deviceSetup,foundDevices,devicesRequested,deviceInit) {
+  let bufferVals = {
+    x_val: 0,
+    y_val: 0,
+    z_val: 0,
+    rX_val: 0,
+    rY_val: 0,
+    slider_val: 0,
+    x: false,
+    y: false,
+    z: false,
+    rX: false,
+    rY: false,
+    slider: false,
+  }
+  ZeroDeviceSetup(deviceSetup,foundDevices,devicesRequested,deviceInit,bufferVals)
+  function ZeroDeviceSetup(deviceSetup,foundDevices,devicesRequested,deviceInit,bufferVals) {
     for (const key of Object.keys(foundDevices)) { deviceSetup[key] = 0 }
     const keys = Object.keys(foundDevices);
     keys.forEach(jsId => {
@@ -176,13 +212,13 @@ try {
           const buttonArray = dbd.vendorIds[foundDevices[jsId].vendorId]?.products[foundDevices[jsId].productId]
           const device = new HID.HID(foundDevices[jsId].path)
           deviceInit.push(device)
-          let hasMoved = false;
           let gripHandle_current = null
           let gripHandle_previous = null
           let gripHandle_grip = null
           let gripHandle_flip = null
           let gripAxis_current = null
-          let gripAxis_previous = null
+          let gripAxis_previous = 'derp'
+          let gripBuffer_current = null
           let virpil_pedal_movementDetected = false
           let virpil_pedal_distance = null
           const requestedDevices = devicesRequested[jsId]
@@ -203,27 +239,58 @@ try {
             }
 
             //! Dashboard
-
-
             if (windowItemsStore.get('currentPage') == 'dashboard') {
               if (deviceSetup[jsId] == 0) { initializeUI(buttonArray.bufferDecoded,requestedDevices,"from_brain-detection-initialize"); deviceSetup[jsId] = 1 }
               //TODO Detect axis travel some how to get median distance
               let medianDistance = 30000
               if (foundDevices[jsId].vendorId == 13124) { //virpil shows median on all x,y,z,z(pedals) devices as 30000
                 medianDistance = 30000
+                bufferVals.x_val = medianDistance
+                bufferVals.y_val = medianDistance
+                bufferVals.z_val = medianDistance
+                bufferVals.rX_val = medianDistance
+                bufferVals.rY_val = medianDistance
               }
-    
-              let result_processAxisBuffer = processAxisBuffer(byteArray,buttonArray.bufferDecoded,medianDistance,hasMoved)
-              //!virpil VPC ACE-Torq Rudder (START)
               const device_virpil_pedals = foundDevices[jsId].vendorId == 13124 && foundDevices[jsId].productId == 505
-              if (device_virpil_pedals) {
-                virpil_pedal_distance = byteArray[1] //buffer value between 0-30000 (left pedal) and 30000-60000 (right pedal)
-                result_processAxisBuffer = { detection: 'z', ind: 0 }
+              let result_processAxisBuffer = null;
+              if (!device_virpil_pedals) {
+                
+                result_processAxisBuffer = processAxisBuffer(byteArray,buttonArray.bufferDecoded,medianDistance,bufferVals,jsId)
+              }
+             
+              //!virpil VPC ACE-Torq Rudder (START)
+              try {
+                if (device_virpil_pedals) {
+                  virpil_pedal_distance = byteArray[1] //buffer value between 0-30000 (left pedal) and 30000-60000 (right pedal)
+                  const virpil_processAxisBuffer = { detection: 'z', ind: 0, val: virpil_pedal_distance }
+                  if (!virpil_pedal_movementDetected 
+                    && virpil_pedal_distance !== medianDistance
+                  ) {
+                    virpil_pedal_movementDetected = true
+                    if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Axis:`, virpil_processAxisBuffer.detection, virpil_processAxisBuffer) }
+                    if (deviceSetup[jsId] == 2) {
+                      const package = {
+                        keybindArray: null,
+                        data: result_processAxisBuffer,
+                        deviceInfo: requestedDevices,
+                        receiver: "from_brain-detection",
+                        keybindArticulation: keybindArticulation.keybindArticulation
+                      }
+                      package.keybindArray = findKeybind(`${requestedDevices.position}_${virpil_processAxisBuffer.detection}`,actionmaps.get('discoveredKeybinds'))
+                      blastToUI(package)
+                    }
+                  } 
+                  else if (virpil_pedal_movementDetected && virpil_pedal_distance === medianDistance) {
+                    virpil_pedal_movementDetected = false
+                  }
+                }
+              }
+              catch (e) {
+                logs_error(e.stack)
               }
               //!virpil VPC ACE-Torq Rudder (END)
-
               //! AXIS
-              if (result_processAxisBuffer) {
+              if (result_processAxisBuffer && !device_virpil_pedals) {
                 const package = {
                   keybindArray: null,
                   data: result_processAxisBuffer,
@@ -231,44 +298,36 @@ try {
                   receiver: "from_brain-detection",
                   keybindArticulation: keybindArticulation.keybindArticulation
                 }
-                gripAxis_current = result_processAxisBuffer.detection
-    
-                //!virpil VPC ACE-Torq Rudder (START)
-                if (device_virpil_pedals) {
-                  gripAxis_current = virpil_pedal_distance
-                  if (!virpil_pedal_movementDetected && gripAxis_current !== medianDistance) {
-                    virpil_pedal_movementDetected = true
-                    if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer.detection, result_processAxisBuffer) }
-                    if (deviceSetup[jsId] == 2) {
-                      package.keybindArray = findKeybind(`${requestedDevices.position}_${result_processAxisBuffer.detection}`,actionmaps.get('discoveredKeybinds'))
-                      blastToUI(package) 
-                    }
-                    gripAxis_previous = gripAxis_current;
-                  } 
-                  else if (virpil_pedal_movementDetected && gripAxis_current === medianDistance) {
-                    virpil_pedal_movementDetected = false
+                
+                // console.log(`Key: Y", Value: ${bufferVals.y_val} ${bufferVals.y}`,`Key: X", Value: ${bufferVals.x_val} ${bufferVals.x}`)
+                // console.log(gripAxis_current,gripAxis_previous)
+                Object.entries(bufferVals).forEach(([key, value]) => {
+                  if (value == true) { 
+                    // console.log(`Key: ${key}, Value: ${value}`)
+                    gripBuffer_current = key
+                    gripAxis_current = key
                   }
-                }
-                //!virpil VPC ACE-Torq Rudder (END)
-                if (gripAxis_current !== gripAxis_previous 
-                  && !device_virpil_pedals
+                })
+                if (!device_virpil_pedals
+                  && (bufferVals.x || bufferVals.y || bufferVals.z || bufferVals.slider || bufferVals.rX || bufferVals.rY)
+                  && (gripAxis_current != gripAxis_previous)
                 ) {
+                  
                   if (foundDevices[jsId].vendorId == 13124) {
-                    if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer);}
+                    if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer) }
                     if (deviceSetup[jsId] == 2) {
-                      package.keybindArray = findKeybind(`${requestedDevices.position}_${gripAxis_current}`,actionmaps.get('discoveredKeybinds'))
-                      blastToUI(package) 
+                      package.keybindArray = findKeybind(`${requestedDevices.position}_${gripBuffer_current}`,actionmaps.get('discoveredKeybinds'))
+                      blastToUI(package)
                     }
                   }
                   else {
-                    if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer);}
+                    if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer) }
                     if (deviceSetup[jsId] == 2) {
-                      package.keybindArray = findKeybind(`${requestedDevices.position}_${gripAxis_current}`,actionmaps.get('discoveredKeybinds'))
-                      blastToUI(package) 
+                      package.keybindArray = findKeybind(`${requestedDevices.position}_${gripBuffer_current}`,actionmaps.get('discoveredKeybinds'))
+                      blastToUI(package)
                     }
                   }
-                  // Update previous state to current after processing
-                  gripAxis_previous = gripAxis_current;
+                  gripAxis_previous = gripAxis_current
                 }
               }
               //! BUTTON

@@ -377,7 +377,7 @@
 			"v_weapon_manual_gimbal_lock_vector":"Manual Gimbal Mode - Lock Aim Vector",
 			"v_weapon_pip_combination_type_set_combined_weapon_group":"Pip Combination Type: Set One PIP Per Weapon Type",
 			"v_weapon_pip_combination_type_set_single":"Pip Combination Type: Set One PIP Per Weapon",
-			"v_weapon_pip_combination_type_toggle":"55555555555",
+			"v_weapon_pip_combination_type_toggle":"Pip Precision Lines Toggle",
 			"v_weapon_pip_fade_off":"Pip Fading Off",
 			"v_weapon_pip_fade_on":"PIP Fading On",
 			"v_weapon_pip_fade_toggle":"PIP Fading Toggle",
