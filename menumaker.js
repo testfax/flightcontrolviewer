@@ -8,14 +8,13 @@ const fs = require('fs')
 const links = {
     dashboard: async function() {
         store.set('currentPage','dashboard')
-        ipcMain.emit(event,data)
-        BrowserWindow.fromId(1).loadURL(`file://${path.join(cwd, 'renderers/dashboard/dashboard.html')}`)
         ipcMain.emit('changePage','change')
+        BrowserWindow.fromId(1).loadURL(`file://${path.join(cwd, 'renderers/dashboard/dashboard.html')}`)
     },
     getbuffer: async function() {
         store.set('currentPage','getbuffer')
-        BrowserWindow.fromId(1).loadURL(`file://${path.join(cwd, 'renderers/getbuffer/getbuffer.html')}`)
         ipcMain.emit('changePage','change')
+        BrowserWindow.fromId(1).loadURL(`file://${path.join(cwd, 'renderers/getbuffer/getbuffer.html')}`)
     },
     checkForUpdates: async function() {
         try {

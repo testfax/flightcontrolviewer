@@ -114,44 +114,59 @@ async function clickedEvent(evt) {
 
 
 ipcRenderer.on('from_brain-detection', (package) => {
-  const changeButton = document.getElementById(`${package.deviceInfo.position}_${package.data.ind}_assignment`)
-  let bindStack = []
-  if (package.keybindArray != 0) { 
-    package.keybindArray.forEach(item => {
-      bindStack.push({ [item.categoryName] : { "action": item.actions[0] } })
-    })
-    console.log("STACK:",bindStack)
-    let screenReady = '';
-    bindStack.forEach(item => {
-      for (let category in item) {
-        screenReady += `CAT: ${category}\n`;
-        screenReady += `- ACTION: ${item[category].action}\n`;
-      }
-    })
-    changeButton.innerText = screenReady
+  try {
+    const changeButton = document.getElementById(`${package.deviceInfo.position}_${package.data.ind}_assignment`)
+    const changeButton2 = document.getElementById(`${package.deviceInfo.position}_displayedBind_assignment`)
+    const title = document.getElementById(`${package.deviceInfo.position}_displayedBind_position`)
+    let bindStack = []
+    if (package.keybindArray != 0) { 
+      package.keybindArray.forEach(item => {
+        bindStack.push({ [item.categoryName] : { "action": item.actions[0] } })
+      })
+      // console.log("STACK:",package.data)
+      let screenReady = ''
+      bindStack.forEach(item => {
+        for (let category in item) {
+          if (package.keybindArticulation) {
+            let cat = package.keybindArticulation.categories[category]
+            let act = package.keybindArticulation.actions[item[category].action]
+            if (cat) { screenReady += `${cat}\n` }
+            else { screenReady += `${package.detection} CAT: ${category}\n` }
+            if (act) { screenReady += `-> ${act}\n` }
+            else { screenReady += `- ACTION: ${item[category].action}\n` }
+          }
+        }
+      })
+      changeButton.innerText = screenReady
+      changeButton2.innerText = screenReady
+      title.innerText = package.deviceInfo.product + ` «» ` + package.data.detection.toUpperCase()
+    }
+    else {
+      changeButton.innerText = package.data.detection
+      changeButton2.innerText = package.data.detection
+    }
+    let allColors = document.getElementsByClassName(`currentButton_${package.deviceInfo.position}`)
+    if (allColors.length > 0) {
+      Array.from(allColors).forEach(item => {
+        if (item.classList.contains(`currentButton_${package.deviceInfo.position}`)) {
+          item.classList.remove(`currentButton_${package.deviceInfo.position}`)
+          item.classList.remove('font-BLOCKY-green')
+          item.classList.add('w3-text-orange')
+        }
+      })
+    }
+    changeButton.classList.remove(`w3-text-orange`)
+    changeButton.classList.add('font-BLOCKY-green')
+    changeButton.classList.add(`currentButton_${package.deviceInfo.position}`)
   }
-  else {
-    changeButton.innerText = package.data.detection
+  catch (e) {
+    console.log(e)
   }
 
-
-  let allColors = document.getElementsByClassName(`currentButton_${package.deviceInfo.position}`)
-
-  if (allColors.length > 0) {
-    Array.from(allColors).forEach(item => {
-      if (item.classList.contains(`currentButton_${package.deviceInfo.position}`)) {
-        item.classList.remove(`currentButton_${package.deviceInfo.position}`)
-        item.classList.remove('font-BLOCKY-green')
-        item.classList.add('w3-text-orange')
-      }
-    })
-  }
-  changeButton.classList.remove(`w3-text-orange`)
-  changeButton.classList.add('font-BLOCKY-green')
-  changeButton.classList.add(`currentButton_${package.deviceInfo.position}`)
 })
 ipcRenderer.on('from_brain-detection-initialize', (package) => {
   document.getElementById(`${package.deviceInfo.position}_position`).innerText = package.deviceInfo.product
+  document.getElementById(`${package.deviceInfo.position}_displayedBind_position`).innerText = package.deviceInfo.product
   const container = document.getElementById(`${package.deviceInfo.position}bar_container`)
   let dynamicDom = document.getElementsByClassName(`${package.deviceInfo.position}_DynamicDom`)
   dynamicDom = Array.from(dynamicDom)

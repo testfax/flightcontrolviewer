@@ -113,9 +113,14 @@ async function clickedEvent(evt) {
 }
 
 ipcRenderer.on('from_brain-detection-getbuffer', (package) => {
-  package.data.forEach((ind,index) => {
-    document.getElementById(`${package.deviceInfo.position}_${index}_assignment`).innerText = ind
-  })
+  try {
+    package.data.forEach((ind,index) => {
+      document.getElementById(`${package.deviceInfo.position}_${index}_assignment`).innerText = ind
+    })
+  }
+  catch (e) {
+    console.log(e)
+  }
 })
 ipcRenderer.on('from_brain-detection-initialize-getbuffer', (package) => {
   document.getElementById(`${package.deviceInfo.position}_position`).innerText = package.deviceInfo.product

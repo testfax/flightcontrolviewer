@@ -1,5 +1,6 @@
 const { logs, logs_error, logs_debug } = require('../utils/logConfig')
 try {
+  const keybindArticulation = require('../staticData.json')
   const throttle = require('lodash.throttle');
   const { blastToUI } = require('../brain/input-functions')
   const { app, ipcMain, BrowserWindow, webContents  } = require('electron');
@@ -9,8 +10,8 @@ try {
   const deviceBufferDecode = new Store({ name: 'deviceBufferDecode'})
   const deviceStateData = new Store({ name: "deviceInfo" });
   const thisWindow = windowItemsStore.get('electronWindowIds')
-  const showConsoleMessages = 1
-  // const showConsoleMessages = windowItemsStore.get('showConsoleMessages')
+  // const showConsoleMessages = 1
+  const showConsoleMessages = windowItemsStore.get('showConsoleMessages')
   const HID = require('node-hid')
   //!Functions!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   function initializeUI(data,deviceInfo,receiver) {
@@ -110,14 +111,7 @@ try {
     if (key in discoveredKeybinds) { return discoveredKeybinds[key] } 
     else { return 0 }
   }
-  function ZeroDeviceSetup() {
-    for (const key of Object.keys(foundDevices)) {
-      deviceSetup[key] = 0;
-    }
-  }
-  ipcMain.on('changePage', async (receivedData) => {
-    ZeroDeviceSetup()
-  })
+
   //!Startup Variables!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   let devices = HID.devices()
   // const uniqueDevices = Array.from(new Map(devices
@@ -159,210 +153,229 @@ try {
    * Controls joystick buffer information flow to the UI.
    */
   //
-  const deviceSetup = {};
-  ZeroDeviceSetup()
-  
+
+  ipcMain.on('changePage', async (receivedData) => {
+    deviceInit.forEach(device => device.removeAllListeners())
+    setTimeout(() => {
+        if (showConsoleMessages) { logs_debug("[RENDERER]".bgGreen,"Page Change:".yellow,windowItemsStore.get('currentPage')) }
+        ZeroDeviceSetup(deviceSetup,foundDevices,devicesRequested,deviceInit)
+    },300)
+  })
+  let deviceInit = []
+  const deviceSetup = {}
+  ZeroDeviceSetup(deviceSetup,foundDevices,devicesRequested,deviceInit)
+  function ZeroDeviceSetup(deviceSetup,foundDevices,devicesRequested,deviceInit) {
+    for (const key of Object.keys(foundDevices)) { deviceSetup[key] = 0 }
+    const keys = Object.keys(foundDevices);
+    keys.forEach(jsId => {
+      if (foundDevices[jsId] != undefined) { 
+        try {
+          // logs(jsId)
+          // logs(foundDevices[jsId])
+          
+          const buttonArray = dbd.vendorIds[foundDevices[jsId].vendorId]?.products[foundDevices[jsId].productId]
+          const device = new HID.HID(foundDevices[jsId].path)
+          deviceInit.push(device)
+          let hasMoved = false;
+          let gripHandle_current = null
+          let gripHandle_previous = null
+          let gripHandle_grip = null
+          let gripHandle_flip = null
+          let gripAxis_current = null
+          let gripAxis_previous = null
+          let virpil_pedal_movementDetected = false
+          let virpil_pedal_distance = null
+          const requestedDevices = devicesRequested[jsId]
+          const handleData = throttle((data) => {
+            const byteArray = analyzeBuffer(data)
+            //!Get Buffer
+            if (windowItemsStore.get('currentPage') == 'getbuffer') {
+              if (deviceSetup[jsId] == 0) { initializeUI(byteArray,requestedDevices,"from_brain-detection-initialize-getbuffer"); deviceSetup[jsId] = 1 }
+              if (deviceSetup[jsId] == 2) {
+                const package = {
+                  data: byteArray,
+                  deviceInfo: requestedDevices,
+                  receiver: "from_brain-detection-getbuffer",
+                  keybindArray: 0
+                }
+                blastToUI(package)
+              }
+            }
+
+            //! Dashboard
+
+
+            if (windowItemsStore.get('currentPage') == 'dashboard') {
+              if (deviceSetup[jsId] == 0) { initializeUI(buttonArray.bufferDecoded,requestedDevices,"from_brain-detection-initialize"); deviceSetup[jsId] = 1 }
+              //TODO Detect axis travel some how to get median distance
+              let medianDistance = 30000
+              if (foundDevices[jsId].vendorId == 13124) { //virpil shows median on all x,y,z,z(pedals) devices as 30000
+                medianDistance = 30000
+              }
+    
+              let result_processAxisBuffer = processAxisBuffer(byteArray,buttonArray.bufferDecoded,medianDistance,hasMoved)
+              //!virpil VPC ACE-Torq Rudder (START)
+              const device_virpil_pedals = foundDevices[jsId].vendorId == 13124 && foundDevices[jsId].productId == 505
+              if (device_virpil_pedals) {
+                virpil_pedal_distance = byteArray[1] //buffer value between 0-30000 (left pedal) and 30000-60000 (right pedal)
+                result_processAxisBuffer = { detection: 'z', ind: 0 }
+              }
+              //!virpil VPC ACE-Torq Rudder (END)
+
+              //! AXIS
+              if (result_processAxisBuffer) {
+                const package = {
+                  keybindArray: null,
+                  data: result_processAxisBuffer,
+                  deviceInfo: requestedDevices,
+                  receiver: "from_brain-detection",
+                  keybindArticulation: keybindArticulation.keybindArticulation
+                }
+                gripAxis_current = result_processAxisBuffer.detection
+    
+                //!virpil VPC ACE-Torq Rudder (START)
+                if (device_virpil_pedals) {
+                  gripAxis_current = virpil_pedal_distance
+                  if (!virpil_pedal_movementDetected && gripAxis_current !== medianDistance) {
+                    virpil_pedal_movementDetected = true
+                    if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer.detection, result_processAxisBuffer) }
+                    if (deviceSetup[jsId] == 2) {
+                      package.keybindArray = findKeybind(`${requestedDevices.position}_${result_processAxisBuffer.detection}`,actionmaps.get('discoveredKeybinds'))
+                      blastToUI(package) 
+                    }
+                    gripAxis_previous = gripAxis_current;
+                  } 
+                  else if (virpil_pedal_movementDetected && gripAxis_current === medianDistance) {
+                    virpil_pedal_movementDetected = false
+                  }
+                }
+                //!virpil VPC ACE-Torq Rudder (END)
+                if (gripAxis_current !== gripAxis_previous 
+                  && !device_virpil_pedals
+                ) {
+                  if (foundDevices[jsId].vendorId == 13124) {
+                    if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer);}
+                    if (deviceSetup[jsId] == 2) {
+                      package.keybindArray = findKeybind(`${requestedDevices.position}_${gripAxis_current}`,actionmaps.get('discoveredKeybinds'))
+                      blastToUI(package) 
+                    }
+                  }
+                  else {
+                    if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer);}
+                    if (deviceSetup[jsId] == 2) {
+                      package.keybindArray = findKeybind(`${requestedDevices.position}_${gripAxis_current}`,actionmaps.get('discoveredKeybinds'))
+                      blastToUI(package) 
+                    }
+                  }
+                  // Update previous state to current after processing
+                  gripAxis_previous = gripAxis_current;
+                }
+              }
+              //! BUTTON
+              const result_processButtonBuffer = virpil_processButtonBuffer(byteArray,buttonArray.bufferDecoded)
+              if (result_processButtonBuffer) {
+                gripHandle_current = result_processButtonBuffer.detection;
+                if (
+                    gripHandle_current !== gripHandle_previous 
+                  && gripHandle_current !== gripHandle_grip
+                  || gripHandle_flip == 3 
+                ) {
+                  const package = {
+                    keybindArray: null,
+                    data: result_processButtonBuffer,
+                    deviceInfo: requestedDevices,
+                    receiver: "from_brain-detection",
+                    keybindArticulation: keybindArticulation.keybindArticulation
+                  }
+                  if (foundDevices[jsId].vendorId == 13124) { //virpil buttons 1 through 5 have a lever(button3) that can actuate 2 different states. However, star citizen does not recognize the lever(button3) as a button+button combo.
+                    switch (gripHandle_current) {
+                      case 'button1':
+                        if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
+                          gripHandle_grip = gripHandle_current;
+                          if (deviceSetup[jsId] == 2) {
+                            package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
+                            blastToUI(package); 
+                          }
+                          break;
+                      case 'button2':
+                          if (gripHandle_flip != 3) { 
+                            if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
+                            if (deviceSetup[jsId] == 2) {
+                              package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
+                              blastToUI(package) 
+                            }
+                          }
+                          gripHandle_grip = gripHandle_current;
+                          gripHandle_flip = 2;
+                          break;
+                      case 'button3':
+                          if (gripHandle_flip == 2 || gripHandle_flip == 4) { 
+                            if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`,result_processButtonBuffer)  }
+                            if (deviceSetup[jsId] == 2) {
+                              package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
+                              blastToUI(package) 
+                            }
+                          }
+                          gripHandle_flip = 3; 
+                          break;
+                      case 'button4':
+                        if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`,result_processButtonBuffer) }
+                          gripHandle_flip = 4;
+                          if (deviceSetup[jsId] == 2) {
+                            package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
+                            blastToUI(package) 
+                          }
+                          break;
+                      case 'button5':
+                        if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`,result_processButtonBuffer) }
+                          gripHandle_flip = 5;
+                          if (deviceSetup[jsId] == 2) {
+                            package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
+                            blastToUI(package) 
+                          }
+                          break;
+                      default:
+                        if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
+                          if (deviceSetup[jsId] == 2) {
+                            package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
+                            blastToUI(package) 
+                          }
+                          break;
+                  }
+                  }
+                  else {
+                    if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
+                    gripHandle_grip = gripHandle_current
+                    if (deviceSetup[jsId] == 2) {
+                      package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
+                      blastToUI(package); 
+                    }
+                  }
+                  
+                  // Update previous state to current after processing
+                  gripHandle_previous = gripHandle_current;
+                }
+                
+              }
+            }
+          }, 100) //! Throttled for 100ms. Only processes if the buffer is different than last check
+          device.on('data', handleData)
+          device.on('error', err => { logs_error(`Joystick ${jsId.replace(/^js/,'')} error:`, err.stack) })
+          device.on('stop-listeners', () => {
+            device.removeAllListeners()
+          })
+        }
+        catch (e) {
+          logs_error(e.stack)
+        }
+      }
+    }) 
+  }
   /**
    * @function
    * Sets up all devices and watches for device buffers to enter and parses
    */
-  const keys = Object.keys(foundDevices);
-  keys.forEach(jsId => {
-    if (foundDevices[jsId] != undefined) { 
-      try {
-        // logs(jsId)
-        // logs(foundDevices[jsId])
-        
-        const buttonArray = dbd.vendorIds[foundDevices[jsId].vendorId]?.products[foundDevices[jsId].productId]
-        const device = new HID.HID(foundDevices[jsId].path)
-        let hasMoved = false;
-        let gripHandle_current = null
-        let gripHandle_previous = null
-        let gripHandle_grip = null
-        let gripHandle_flip = null
-        let gripAxis_current = null
-        let gripAxis_previous = null
-        let virpil_pedal_movementDetected = false
-        let virpil_pedal_distance = null
-        const requestedDevices = devicesRequested[jsId]
-        const handleData = throttle((data) => {
-          const byteArray = analyzeBuffer(data)
-          //!Get Buffer
-          if (windowItemsStore.get('currentPage') == 'getbuffer') {
-            if (deviceSetup[jsId] == 0) { initializeUI(byteArray,requestedDevices,"from_brain-detection-initialize-getbuffer"); deviceSetup[jsId] = 1 }
-            if (deviceSetup[jsId] == 2) {
-              const package = {
-                data: byteArray,
-                deviceInfo: requestedDevices,
-                receiver: "from_brain-detection-getbuffer",
-                keybindArray: 0
-              }
-              blastToUI(package)
-            }
-          }
-
-          //! Dashboard
-
-
-          if (windowItemsStore.get('currentPage') == 'dashboard') {
-            if (deviceSetup[jsId] == 0) { initializeUI(buttonArray.bufferDecoded,requestedDevices,"from_brain-detection-initialize"); deviceSetup[jsId] = 1 }
-            //TODO Detect axis travel some how to get median distance
-            let medianDistance = 30000
-            if (foundDevices[jsId].vendorId == 13124) { //virpil shows median on all x,y,z,z(pedals) devices as 30000
-              medianDistance = 30000
-            }
   
-            let result_processAxisBuffer = processAxisBuffer(byteArray,buttonArray.bufferDecoded,medianDistance,hasMoved)
-            //!virpil VPC ACE-Torq Rudder (START)
-            const device_virpil_pedals = foundDevices[jsId].vendorId == 13124 && foundDevices[jsId].productId == 505
-            if (device_virpil_pedals) {
-              virpil_pedal_distance = byteArray[1] //buffer value between 0-30000 (left pedal) and 30000-60000 (right pedal)
-              result_processAxisBuffer = { detection: 'z', ind: 0 }
-            }
-            //!virpil VPC ACE-Torq Rudder (END)
-            //! AXIS
-            if (result_processAxisBuffer) {
-              const package = {
-                keybindArray: null,
-                data: result_processAxisBuffer,
-                deviceInfo: requestedDevices,
-                receiver: "from_brain-detection"
-              }
-              gripAxis_current = result_processAxisBuffer.detection
-  
-              //!virpil VPC ACE-Torq Rudder (START)
-              if (device_virpil_pedals) {
-                gripAxis_current = virpil_pedal_distance
-                if (!virpil_pedal_movementDetected && gripAxis_current !== medianDistance) {
-                  virpil_pedal_movementDetected = true
-                  if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer.detection, result_processAxisBuffer) }
-                  if (deviceSetup[jsId] == 2) {
-                    package.keybindArray = findKeybind(`${requestedDevices.position}_${result_processAxisBuffer.detection}`,actionmaps.get('discoveredKeybinds'))
-                    blastToUI(package) 
-                  }
-                  gripAxis_previous = gripAxis_current;
-                } 
-                else if (virpil_pedal_movementDetected && gripAxis_current === medianDistance) {
-                  virpil_pedal_movementDetected = false
-                }
-              }
-              //!virpil VPC ACE-Torq Rudder (END)
-              if (gripAxis_current !== gripAxis_previous 
-                && !device_virpil_pedals
-              ) {
-                if (foundDevices[jsId].vendorId == 13124) {
-                  if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer);}
-                  if (deviceSetup[jsId] == 2) {
-                    package.keybindArray = findKeybind(`${requestedDevices.position}_${gripAxis_current}`,actionmaps.get('discoveredKeybinds'))
-                    blastToUI(package) 
-                  }
-                }
-                else {
-                  if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Axis:`, result_processAxisBuffer);}
-                  if (deviceSetup[jsId] == 2) {
-                    package.keybindArray = findKeybind(`${requestedDevices.position}_${gripAxis_current}`,actionmaps.get('discoveredKeybinds'))
-                    blastToUI(package) 
-                  }
-                }
-                // Update previous state to current after processing
-                gripAxis_previous = gripAxis_current;
-              }
-            }
-            //! BUTTON
-            const result_processButtonBuffer = virpil_processButtonBuffer(byteArray,buttonArray.bufferDecoded)
-            if (result_processButtonBuffer) {
-              gripHandle_current = result_processButtonBuffer.detection;
-              if (
-                   gripHandle_current !== gripHandle_previous 
-                && gripHandle_current !== gripHandle_grip
-                || gripHandle_flip == 3 
-              ) {
-                const package = {
-                  keybindArray: null,
-                  data: result_processButtonBuffer,
-                  deviceInfo: requestedDevices,
-                  receiver: "from_brain-detection"
-                }
-                if (foundDevices[jsId].vendorId == 13124) { //virpil buttons 1 through 5 have a lever(button3) that can actuate 2 different states. However, star citizen does not recognize the lever(button3) as a button+button combo.
-                  switch (gripHandle_current) {
-                    case 'button1':
-                      if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
-                        gripHandle_grip = gripHandle_current;
-                        if (deviceSetup[jsId] == 2) {
-                          package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
-                          blastToUI(package); 
-                        }
-                        break;
-                    case 'button2':
-                        if (gripHandle_flip != 3) { 
-                          if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
-                          if (deviceSetup[jsId] == 2) {
-                            package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
-                            blastToUI(package) 
-                          }
-                        }
-                        gripHandle_grip = gripHandle_current;
-                        gripHandle_flip = 2;
-                        break;
-                    case 'button3':
-                        if (gripHandle_flip == 2 || gripHandle_flip == 4) { 
-                          if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`,result_processButtonBuffer)  }
-                          if (deviceSetup[jsId] == 2) {
-                            package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
-                            blastToUI(package) 
-                          }
-                        }
-                        gripHandle_flip = 3; 
-                        break;
-                    case 'button4':
-                      if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`,result_processButtonBuffer) }
-                        gripHandle_flip = 4;
-                        if (deviceSetup[jsId] == 2) {
-                          package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
-                          blastToUI(package) 
-                        }
-                        break;
-                    case 'button5':
-                      if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`,result_processButtonBuffer) }
-                        gripHandle_flip = 5;
-                        if (deviceSetup[jsId] == 2) {
-                          package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
-                          blastToUI(package) 
-                        }
-                        break;
-                    default:
-                      if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
-                        if (deviceSetup[jsId] == 2) {
-                          package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
-                          blastToUI(package) 
-                        }
-                        break;
-                }
-                }
-                else {
-                  if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Button:`, result_processButtonBuffer); }
-                  gripHandle_grip = gripHandle_current
-                  if (deviceSetup[jsId] == 2) {
-                    package.keybindArray = findKeybind(`${requestedDevices.position}_${gripHandle_current}`,actionmaps.get('discoveredKeybinds'))
-                    blastToUI(package); 
-                  }
-                }
-                
-                // Update previous state to current after processing
-                gripHandle_previous = gripHandle_current;
-              }
-              
-            }
-          }
-        }, 100) //! Throttled for 100ms. Only processes if the buffer is different than last check
-        device.on('data', handleData);
-        device.on('error', err => { logs_error(`Joystick ${jsId.replace(/^js/,'')} error:`, err.stack) })
-      }
-      catch (e) {
-        logs_error(e.stack)
-      }
-    }
-  })
 
   //!Communications between frontside and backside (renderer and main(thisfile)).!!!!!!!!!!!!!!!!!!!
   //Listener
@@ -374,5 +387,5 @@ try {
   })
 }
 catch (error) {
-  logs_error(error.stack)
+  logs_error("[ERROR]".red,error.stack)
 }
