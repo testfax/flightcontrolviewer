@@ -9,7 +9,7 @@ function main() {
     const fs = require('fs')
     
     const colors = require('colors')
-    const { windowPosition } = require('./utils/utilities')
+    const { windowPosition, autoUpdater } = require('./utils/utilities')
     const electronWindowIds = new Store({ name: "electronWindowIds" });
     electronWindowIds.set('currentPage','dashboard');
     if (!electronWindowIds.get('theme')) {
@@ -117,7 +117,7 @@ function main() {
 
         const handleLoadFinish = () => {
           setTimeout(() => {
-              // autoUpdaterStuff()
+              autoUpdater()
             },5000)
 
           if (!isLoadFinished) {

@@ -18,7 +18,7 @@ const links = {
     },
     checkForUpdates: async function() {
         try {
-            ipcMain.emit('changePage','change')
+            // ipcMain.emit('changePage','change')
             autoUpdater()
         }
         catch (e) {

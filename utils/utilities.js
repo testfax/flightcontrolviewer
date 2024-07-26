@@ -87,6 +87,7 @@ const util = {
     autoUpdater: async () => {
         // Auto Updater
         if (app.isPackaged) { 
+            const win = BrowserWindow.fromId(1)
             const { autoUpdater } = require('electron-updater')
             logs_debug("Running Auto-Updater Functions".yellow)
             autoUpdater.logger = require('electron-log')
