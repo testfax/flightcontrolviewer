@@ -1,6 +1,6 @@
 const { logs, logs_error, logs_debug } = require('../utils/logConfig')
 try {
-  const keybindArticulation = require('../staticData.json')
+  const staticData = require('../staticData.json')
   const throttle = require('lodash.throttle');
   const { blastToUI } = require('../brain/input-functions')
   const { app, ipcMain, BrowserWindow, webContents  } = require('electron');
@@ -159,8 +159,6 @@ try {
   for (const [key, { vendorId, productId }] of Object.entries(devicesRequested)) {
     foundDevices[key] = devices.find(device => device.vendorId === vendorId && device.productId === productId);
   }
-  if (!deviceBufferDecode.get("deviceBufferDecode")) { deviceBufferDecode.set('deviceBufferDecode',{}) }
-  const dbd = deviceBufferDecode.get('deviceBufferDecode')
 
   /**
    * @object
@@ -215,7 +213,7 @@ try {
           // logs(jsId)
           // logs(foundDevices[jsId])
           
-          const buttonArray = dbd.vendorIds[foundDevices[jsId].vendorId]?.products[foundDevices[jsId].productId]
+          const buttonArray = staticData.deviceBufferDecode.vendorIds[foundDevices[jsId].vendorId]?.products[foundDevices[jsId].productId]
           const device = new HID.HID(foundDevices[jsId].path)
           deviceInit.push(device)
           let gripHandle_current = null
@@ -263,34 +261,29 @@ try {
               }
 
               //!virpil VPC ACE-Torq Rudder (START)
-              try {
-                if (device_virpil_pedals) {
-                  virpil_pedal_distance = byteArray[1] //buffer value between 0-30000 (left pedal) and 30000-60000 (right pedal)
-                  const virpil_processAxisBuffer = { detection: 'z', ind: 0, val: virpil_pedal_distance }
-                  if (!virpil_pedal_movementDetected
-                    && virpil_pedal_distance !== medianDistance
-                  ) {
-                    virpil_pedal_movementDetected = true
-                    if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Axis:`, virpil_processAxisBuffer.detection, virpil_processAxisBuffer) }
-                    if (deviceSetup[jsId] == 2) {
-                      const package = {
-                        keybindArray: null,
-                        data: virpil_processAxisBuffer,
-                        deviceInfo: requestedDevices,
-                        receiver: "from_brain-detection",
-                        keybindArticulation: keybindArticulation.keybindArticulation
-                      }
-                      package.keybindArray = findKeybind(`${requestedDevices.position}_${virpil_processAxisBuffer.detection}`,actionmaps.get('discoveredKeybinds'))
-                      blastToUI(package)
+              if (device_virpil_pedals) {
+                virpil_pedal_distance = byteArray[1] //buffer value between 0-30000 (left pedal) and 30000-60000 (right pedal)
+                const virpil_processAxisBuffer = { detection: 'z', ind: 0, val: virpil_pedal_distance }
+                if (!virpil_pedal_movementDetected
+                  && virpil_pedal_distance !== medianDistance
+                ) {
+                  virpil_pedal_movementDetected = true
+                  if (showConsoleMessages) { logs_debug(`${jsId.toUpperCase()} Axis:`, virpil_processAxisBuffer.detection, virpil_processAxisBuffer) }
+                  if (deviceSetup[jsId] == 2) {
+                    const package = {
+                      keybindArray: null,
+                      data: virpil_processAxisBuffer,
+                      deviceInfo: requestedDevices,
+                      receiver: "from_brain-detection",
+                      keybindArticulation: staticData.keybindArticulation
                     }
-                  }
-                  else if (virpil_pedal_movementDetected && virpil_pedal_distance === medianDistance) {
-                    virpil_pedal_movementDetected = false
+                    package.keybindArray = findKeybind(`${requestedDevices.position}_${virpil_processAxisBuffer.detection}`,actionmaps.get('discoveredKeybinds'))
+                    blastToUI(package)
                   }
                 }
-              }
-              catch (e) {
-                logs_error(e.stack)
+                else if (virpil_pedal_movementDetected && virpil_pedal_distance === medianDistance) {
+                  virpil_pedal_movementDetected = false
+                }
               }
               //!virpil VPC ACE-Torq Rudder (END)
               //! AXIS
@@ -300,7 +293,7 @@ try {
                   data: result_processAxisBuffer,
                   deviceInfo: requestedDevices,
                   receiver: "from_brain-detection",
-                  keybindArticulation: keybindArticulation.keybindArticulation
+                  keybindArticulation: staticData.keybindArticulation
                 }
                 try {
                   gripAxis_current = package.data.detection
@@ -344,7 +337,7 @@ try {
                     data: result_processButtonBuffer,
                     deviceInfo: requestedDevices,
                     receiver: "from_brain-detection",
-                    keybindArticulation: keybindArticulation.keybindArticulation
+                    keybindArticulation: staticData.keybindArticulation
                   }
                   if (foundDevices[jsId].vendorId == 13124) { //virpil buttons 1 through 5 have a lever(button3) that can actuate 2 different states. However, star citizen does not recognize the lever(button3) as a button+button combo.
                     switch (gripHandle_current) {
@@ -422,9 +415,7 @@ try {
           device.on('error', err => { logs_error(`Joystick ${jsId.replace(/^js/,'')} error:`, err.stack) })
           device.on('stop-listeners', () => { device.removeAllListeners() })
         }
-        catch (e) {
-          logs_error(e.stack)
-        }
+        catch (e) { logs_error(e.stack) }
       }
     }) 
   }

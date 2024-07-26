@@ -7,7 +7,7 @@ const fs = require('fs')
 const colors = require('colors')
 const windowItemsStore = new Store({ name: 'electronWindowIds'})
 const showConsoleMessages = windowItemsStore.get('showConsoleMessages')
-const xml2js = require('xml2js');
+const xml2js = require('xml2js')
 
 const util = {
     convertXML: async(path) => {
