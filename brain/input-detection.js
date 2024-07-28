@@ -33,8 +33,8 @@ try {
     const joystickAxisNames = {
       1: 'x',
       3: 'y',
-      5: 'rY',
-      7: 'rX',
+      5: 'roty',
+      7: 'rotx',
       9: 'slider',
       11: 'z'
     };
@@ -62,7 +62,7 @@ try {
     joystickAxes.forEach(index => {
       const bufferValue = buffer[index]
       if (bufferValue !== undefined && bufferValue !== medianDistance) {
-        const axisName = joystickAxisNames[index];
+        const axisName = joystickAxisNames[index]
         detection = axisName;
         ind = Object.entries(buttonArray).findIndex(([key, value]) => key === axisName)
         val = buffer[index]
@@ -73,8 +73,8 @@ try {
         if (axisName == 'x') { bufferVals.x_val = val; checker(bufferVals.x_val) }
         if (axisName == 'y') { bufferVals.y_val = val; checker(bufferVals.y_val) }
         if (axisName == 'z') { bufferVals.z_val = val; checker(bufferVals.z_val) }
-        if (axisName == 'rY') { bufferVals.rY_val = val; checker(bufferVals.rY_val) }
-        if (axisName == 'rX') { bufferVals.rX_val = val; checker(bufferVals.rX_val) }
+        if (axisName == 'roty') { bufferVals.roty_val = val; checker(bufferVals.roty_val) }
+        if (axisName == 'rotx') { bufferVals.rotx_val = val; checker(bufferVals.rotx_val) }
         function checker(input) {
           let state = false;
           if (input >= buffValHi) { state = true }
@@ -82,9 +82,9 @@ try {
           bufferVals[axisName] = state
           bufferVals[axisName + '_detection'] = axisName
           bufferVals[axisName + '_ind'] = ind
-          if (state) { 
-            if (showConsoleMessages) { console.log(index,bufferVals[axisName],"HIT".red,jsId,'BID'.blue,axisName) }
-            build = { "detection":axisName, "ind":bufferVals[axisName + '_ind'] }
+          if (state) {
+            build = { "detection": axisName, "ind":bufferVals[axisName + '_ind'] }
+            if (showConsoleMessages) { console.log(index,bufferVals[axisName],"HIT".red,jsId,'BID'.blue,axisName,build) }
             return { build }
           }
         }
@@ -181,26 +181,26 @@ try {
     x_val: 0,
     y_val: 0,
     z_val: 0,
-    rX_val: 0,
-    rY_val: 0,
+    rotx_val: 0,
+    roty_val: 0,
     slider_val: 0,
     x: false,
     y: false,
     z: false,
-    rX: false,
-    rY: false,
+    rotx: false,
+    roty: false,
     slider: false,
     x_detection: null,
     y_detection: null,
     z_detection: null,
     slider_detection: null,
-    rX_detection: null,
-    rY_detection: null,
+    rotx_detection: null,
+    roty_detection: null,
     x_ind: null,
     y_ind: null,
     z_ind: null,
-    rY_ind: null,
-    rX_ind: null,
+    roty_ind: null,
+    rotx_ind: null,
   }
   ZeroDeviceSetup(deviceSetup,foundDevices,devicesRequested,deviceInit,bufferVals)
   function ZeroDeviceSetup(deviceSetup,foundDevices,devicesRequested,deviceInit,bufferVals) {
@@ -250,8 +250,8 @@ try {
                 bufferVals.x_val = medianDistance
                 bufferVals.y_val = medianDistance
                 bufferVals.z_val = medianDistance
-                bufferVals.rX_val = medianDistance
-                bufferVals.rY_val = medianDistance
+                bufferVals.rotx_val = medianDistance
+                bufferVals.roty_val = medianDistance
               }
               const device_virpil_pedals = foundDevices[jsId].vendorId == 13124 && foundDevices[jsId].productId == 505
               let result_processAxisBuffer = null;
@@ -297,7 +297,7 @@ try {
                 try {
                   gripAxis_current = package.data.detection
                   if (!device_virpil_pedals
-                    && (bufferVals.x || bufferVals.y || bufferVals.z || bufferVals.slider || bufferVals.rX || bufferVals.rY)
+                    && (bufferVals.x || bufferVals.y || bufferVals.z || bufferVals.slider || bufferVals.rotx || bufferVals.roty)
                     && (gripAxis_current != gripAxis_previous)
                   ) {
                     // package.data = buffer_current
