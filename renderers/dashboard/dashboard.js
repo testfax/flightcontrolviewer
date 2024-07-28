@@ -114,8 +114,6 @@ async function clickedEvent(evt) {
 
 
 ipcRenderer.on('from_brain-detection', (package) => {
-  console.log(package.keybindArray)
-  console.log(package)
   try {
     const changeButton = document.getElementById(`${package.deviceInfo.position}_${package.data.ind}_assignment`)
     const changeButton2 = document.getElementById(`${package.deviceInfo.position}_displayedBind_assignment`)
