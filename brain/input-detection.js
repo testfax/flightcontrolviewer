@@ -117,9 +117,10 @@ try {
   }
   function analyzeBuffer(data) {
     let byteArray = []
+    const lastBuffer = data.length -1
     for (let i = 0; i < data.length; i++) {
         //For Virpil
-        if (i != 36) { 
+        if (i != lastBuffer) { 
           byteArray.push(data.readUInt16LE(i))
         }
         //
