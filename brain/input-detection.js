@@ -422,7 +422,6 @@ try {
    * @function
    * Sets up all devices and watches for device buffers to enter and parses
    */
-  
 
   //!Communications between frontside and backside (renderer and main(thisfile)).!!!!!!!!!!!!!!!!!!!
   //Listener
