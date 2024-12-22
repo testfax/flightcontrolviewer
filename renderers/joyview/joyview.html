@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self'">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../../public/stylesheets/index.css">
+    <link rel="stylesheet" href="../../public/stylesheets/w3-colors-vivid.css">
+    <link rel="stylesheet" href="../../public/stylesheets/w3-colors-food.css">
+    <link rel="stylesheet" href="../../public/stylesheets/w3.css">
+    <link href="https://fonts.googleapis.com/css2?family=Allerta+Stencil&family=Trade+Winds&display=swap"
+    rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Abel&family=Castoro+Titling&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <title>Joystick Viewer</title>
+</head>
+<body>
+    <div class="w3-container">
+        <div class="w3-row w3-center">
+            <div class="w3-border w3-round w3-col pointer w3-text-orange">
+                <span class="font-BLOCKY w3-xlarge">JOYSTICK VIEWER</span>
+            </div>
+        </div>
+        <br>
+        <div class='w3-row w3-border w3-round w3-xlarge w3-dark-gray' >
+            <div id="displayedBind" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' displayedBind>
+                <i id='displayedBind_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                Displayed Bind
+            </div>
+            <div id="displayedBind_container" class="w3-row-padding">
+                <div class="w3-col s12 m6 l6 w3-section" >
+                    <div id="js2_displayedBind_h" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' displayedBindjs2>
+                        <i id='js2_displayedBind_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                        <span id="js2_displayedBind_position"></span>
+                    </div>
+                    <div id="js2_displayedBind_container" class="w3-margin-left">
+                        <div class="w3-border w3-round-large w3-black">
+                            <table class="w3-table w3-bordered w3-medium">
+                                <tbody id="js2bar_displayedBind_container" >
+                                    <tr>
+                                        <td id="js2_displayedBind_assignment" class="w3-large w3-text-brightgreen font-BLOCKY"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="w3-col s12 m6 l6 w3-section" >
+                    <div id="js1_displayedBind_h" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' displayedBindjs1>
+                        <i id='js1_displayedBind_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                        <span id="js1_displayedBind_position"></span>
+                    </div>
+                    <div id="js1_displayedBind_container" class="w3-margin-left">
+                        <div class="w3-border w3-round-large w3-black">
+                            <table class="w3-table w3-bordered w3-medium">
+                                <tbody id="js1bar_displayedBind_container" >
+                                    <tr>
+                                        <td id="js1_displayedBind_assignment" class="w3-large w3-text-brightgreen font-BLOCKY"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="w3-col s12 m6 l6 w3-section" >
+                    <div id="js3_displayedBind_h" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' displayedBindjs3>
+                        <i id='js3_displayedBind_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                        <span id="js3_displayedBind_position"></span>
+                    </div>
+                    <div id="js3_displayedBind_container" class="w3-margin-left">
+                        <div class="w3-border w3-round-large w3-black">
+                            <table class="w3-table w3-bordered w3-medium">
+                                <tbody id="js3bar_displayedBind_container" >
+                                    <tr>
+                                        <td id="js3_displayedBind_assignment" class="w3-large w3-text-brightgreen font-BLOCKY"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <br>
+        <div class='w3-row w3-border w3-round w3-xlarge w3-dark-gray' >
+            <div id="buffers" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' jsstickBuffer>
+                <i id='buffers_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                Joystick Button List
+            </div>
+            <div id="buffers_container" class="w3-row-padding">
+                <div class="w3-col s12 m6 l6 w3-section" >
+                    <div id="js2" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' js2>
+                        <i id='js2_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                        <span id="js2_position"></span>
+                    </div>
+                    <div id="js2_container" class="w3-margin-left">
+                        <div class="w3-border w3-round-large w3-black">
+                            <table class="w3-table w3-bordered w3-medium">
+                                <tbody id="js2bar_container" >
+                                <tr>
+                                    <th class="w3-text-orange font-BLOCKY">Assignment</th>
+                                    <th class="w3-text-orange font-BLOCKY">Slot</th>
+                                    <th class="w3-text-orange font-BLOCKY">Index</th>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="w3-col s12 m6 l6 w3-section" >
+                    <div id="js1" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' js1>
+                        <i id='js1_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                        <span id="js1_position"></span>
+                    </div>
+                    <div id="js1_container" class="w3-margin-left">
+                        <div class="w3-border w3-round-large w3-black">
+                            <table class="w3-table w3-bordered w3-medium">
+                                <tbody id="js1bar_container" >
+                                <tr>
+                                    <th class="w3-text-orange font-BLOCKY">Assignment</th>
+                                    <th class="w3-text-orange font-BLOCKY">Slot</th>
+                                    <th class="w3-text-orange font-BLOCKY">Index</th>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="w3-col s12 m6 l6 w3-section" >
+                    <div id="js3" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' js3>
+                        <i id='js3_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                        <span id="js3_position"></span>
+                    </div>
+                    <div id="js3_container" class="w3-margin-left">
+                        <div class="w3-border w3-round-large w3-black">
+                            <table class="w3-table w3-bordered w3-medium">
+                                <tbody id="js3bar_container" >
+                                <tr>
+                                    <th class="w3-text-orange font-BLOCKY">Assignment</th>
+                                    <th class="w3-text-orange font-BLOCKY">Slot</th>
+                                    <th class="w3-text-orange font-BLOCKY">Index</th>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <br>
+    </div>
+<script src="../utilities/functions.js" defer></script>
+<script src="joyview.js" defer></script>
+
+
+
+</body>
+</html>
+
+<!-- block -->
+                <!-- <div class='w3-row w3-border w3-round w3-xlarge w3-dark-gray' >
+                    <div id="manufacturedList" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' manufacturedList>
+                        &nbsp;&nbsp;&nbsp;<i id='manufacturedList_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                        Manufactured
+                    </div>
+                    <div id="manufacturedList_container" class="w3-row">
+                        <div class="w3-col s12 m6 l6" >
+                            <div id="alloy-cat" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' alloy-cat>
+                                <i id='alloy-cat_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Alloys
+                            </div>
+                            <div id="alloy-cat_container" class="w3-row">
+                                <div class="w3-border w3-round-large w3-black pointer">
+                                    <span class="w3-vivid-yellowfg2  font-BLOCKY" >&nbsp;<img class='gradePics' src="../../public/images/grade1.png"></img></span>
+                                    <span class="w3-vivid-green1  font-BLOCKY" >250</span>
+                                    <span class="w3-vivid-yellowfg2  font-BLOCKY" >SALVAGED ALLOYS</span>
+                                </div>
+                                <div class="w3-border w3-round-large w3-black pointer">
+                                    <span class="w3-vivid-yellowfg2  font-BLOCKY" >&nbsp;<img class='gradePics' src="../../public/images/grade2.png"></img></span>
+                                    <span class="w3-vivid-green1  font-BLOCKY" >250</span>
+                                    <span class="w3-vivid-yellowfg2  font-BLOCKY" >GALVANIZING ALLOYS</span>
+                                </div>
+                                <div class="w3-border w3-round-large w3-black pointer">
+                                    <span id="" class="w3-vivid-yellowfg2  font-BLOCKY" >&nbsp;<img class='gradePics' src="../../public/images/grade3.png"></img></span>
+                                    <span id="" class="w3-vivid-green1  font-BLOCKY" >250</span>
+                                    <span id="" class="w3-vivid-yellowfg2  font-BLOCKY" >PHASE ALLOYS</span>
+                                </div>
+                                <div class="w3-border w3-round-large w3-black pointer">
+                                    <span id="" class="w3-vivid-yellowfg2  font-BLOCKY" >&nbsp;<img class='gradePics' src="../../public/images/grade4.png"></img></span>
+                                    <span id="" class="w3-vivid-green1  font-BLOCKY" >250</span>
+                                    <span id="" class="w3-vivid-yellowfg2  font-BLOCKY" >PROTO LIGHT ALLOYS</span>
+                                </div>
+                                <div class="w3-border w3-round-large w3-black pointer">
+                                    <span id="" class="w3-vivid-yellowfg2  font-BLOCKY" >&nbsp;<img class='gradePics' src="../../public/images/grade5.png"></img></span>
+                                    <span id="" class="w3-vivid-green1 font-BLOCKY" >250</span>
+                                    <span id="" class="w3-vivid-yellowfg2  font-BLOCKY" >PROTO RADIOLIC ALLOYS</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="w3-col s0 m6 l6" >
+                            <div id="descriptions" class='w3-text-orange pointer w3-black w3-border w3-round font-BLOCKY' descriptions>
+                                <i id='descriptions_arrow' class="w3-text-brightgreen material-icons">arrow_drop_up</i>
+                                Descriptions
+                            </div>
+                            <div id="descriptions_container" class="w3-row">
+                                <div class="w3-border w3-round-large w3-black">
+                                    <span id="" class="w3-vivid-yellowfg2 w3-small" >
+                                        Collected from mining asteroids. Boron is used in ship interior structures, insulation, and in the creation of polymers and ceramics used in station and ship construction. Boron is also used in the manufacture of glass for ships and stations. offering greater strength and thermal shock resistance than other manufacturing techniques. Other uses include agricultural medicine, insecticides, and some advanced medicines.",
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div> -->
+<!-- block -->

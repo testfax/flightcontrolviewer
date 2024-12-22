@@ -139,7 +139,7 @@ const util = {
             })
         }
     },
-    windowPosition: function(win,init) {
+    windowPosition: function(win,init) { 
         //Since the intent is to get the window Size and Position, lets call the function that validates the path of the lounge-client.json
         //After that is received, lets call the Store function to get the contents of that file.
         //Then, once you receive the result from getting the contents of the lounge-client.json
@@ -166,7 +166,7 @@ const util = {
         // if (util.watcherConsoleDisplay('client_path') && request) {
         //     logs_debug("[UTIL]".green,"client_path:".blue,request);
         // }
-        let rsi_stockLocation = path.join('C:','Program Files','Roberts Space Industries','StarCitizen','LIVE')
+        let rsi_stockLocation = path.join('C:','Program Files','Roberts Space Industries','StarCitizen','4.0_PREVIEW')
         let rsi_path = path.normalize(rsi_stockLocation)
         const files = fs.readdirSync(rsi_path);
         let rsi_savedMappings = null

@@ -11,6 +11,11 @@ const links = {
         ipcMain.emit('changePage','change')
         BrowserWindow.fromId(1).loadURL(`file://${path.join(cwd, 'renderers/dashboard/dashboard.html')}`)
     },
+    joyview: async function() {
+        store.set('currentPage','joyview')
+        ipcMain.emit('changePage','change')
+        BrowserWindow.fromId(1).loadURL(`file://${path.join(cwd, 'renderers/joyview/joyview.html')}`)
+    },
     getbuffer: async function() {
         store.set('currentPage','getbuffer')
         ipcMain.emit('changePage','change')
@@ -55,6 +60,21 @@ const template = [
         label: 'Dashboard',
         // click: ()=>{links.statistics();} 
         click: ()=>{links.dashboard()}
+        // submenu: [
+        //     {
+        //         label: 'Sampling',
+        //         click: ()=>{links.sampling()}
+        //     },
+        //     // {
+        //     //     label: 'Test',
+        //     //     click: ()=>{links.test()}
+        //     // }
+        // ]
+    },
+    {
+        label: 'Joystick Viewer',
+        // click: ()=>{links.statistics();} 
+        click: ()=>{links.joyview()}
         // submenu: [
         //     {
         //         label: 'Sampling',

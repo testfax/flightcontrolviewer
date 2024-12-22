@@ -203,7 +203,7 @@
 			"v_ifcs_toggle_gforce_safety":"G-Force Safety On/Off (Toggle/Hold)",
 			"v_ifcs_toggle_speed_limiter":"Speed Limiter - On/Off (Hold/Toggle)",
 			"v_ifcs_toggle_vector_decoupling":"Decoupled Mode (Toggle, Hold)",
-			"v_lock_rotation":"Lock Pitch ? Yaw Movement (Toggle / Hold)",
+			"v_lock_rotation":"Lock Pitch / Yaw Movement (Toggle / Hold)",
 			"v_master_mode_cycle":"Cycle Master Mode (Short Press)",
 			"v_master_mode_cycle_long":"Cycle Master Mode (Long Press)",
 			"v_master_mode_set_nav":"Set Master Mode to Nav",

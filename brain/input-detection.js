@@ -242,7 +242,7 @@ try {
             }
 
             //! Dashboard
-            if (windowItemsStore.get('currentPage') == 'dashboard') {
+            if (windowItemsStore.get('currentPage') == 'dashboard' || windowItemsStore.get('currentPage') == 'joyview') {
               if (deviceSetup[jsId] == 0) { initializeUI(buttonArray.bufferDecoded,requestedDevices,"from_brain-detection-initialize"); deviceSetup[jsId] = 1 }
               //TODO Detect axis travel some how to get median distance
               let medianDistance = 30000
@@ -254,14 +254,17 @@ try {
                 bufferVals.rotx_val = medianDistance
                 bufferVals.roty_val = medianDistance
               }
-              const device_virpil_pedals = foundDevices[jsId].vendorId == 13124 && foundDevices[jsId].productId == 505
+              const specificDevices = {
+                virpil_vpc_ace_torq_rudder: foundDevices[jsId].vendorId == 13124 && foundDevices[jsId].productId == 505
+              }
+              // const specificDevices.virpil_vpc_ace_torq_rudder = foundDevices[jsId].vendorId == 13124 && foundDevices[jsId].productId == 505
               let result_processAxisBuffer = null;
-              if (!device_virpil_pedals) {
+              if (!specificDevices.virpil_vpc_ace_torq_rudder) {
                 result_processAxisBuffer = processAxisBuffer(byteArray,buttonArray.bufferDecoded,medianDistance,bufferVals,jsId)
               }
 
               //!virpil VPC ACE-Torq Rudder (START)
-              if (device_virpil_pedals) {
+              if (specificDevices.virpil_vpc_ace_torq_rudder) {
                 virpil_pedal_distance = byteArray[1] //buffer value between 0-30000 (left pedal) and 30000-60000 (right pedal)
                 const virpil_processAxisBuffer = { detection: 'z', ind: 0, val: virpil_pedal_distance }
                 if (!virpil_pedal_movementDetected
@@ -287,7 +290,7 @@ try {
               }
               //!virpil VPC ACE-Torq Rudder (END)
               //! AXIS
-              if (result_processAxisBuffer && !device_virpil_pedals) {
+              if (result_processAxisBuffer && !specificDevices.virpil_vpc_ace_torq_rudder) {
                 const package = {
                   keybindArray: null,
                   data: result_processAxisBuffer,
@@ -297,7 +300,7 @@ try {
                 }
                 try {
                   gripAxis_current = package.data.detection
-                  if (!device_virpil_pedals
+                  if (!specificDevices.virpil_vpc_ace_torq_rudder
                     && (bufferVals.x || bufferVals.y || bufferVals.z || bufferVals.slider || bufferVals.rotx || bufferVals.roty)
                     && (gripAxis_current != gripAxis_previous)
                   ) {
