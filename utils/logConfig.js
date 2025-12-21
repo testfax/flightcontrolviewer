@@ -72,7 +72,7 @@ try {
         catch(e) { console.log("[LOGS]".red,"getCitizen: No Game Logs Yet...",e) }
     }
     function client_path(request) {
-        let rsi_stockLocation = path.join('C:','Program Files','Roberts Space Industries','StarCitizen','4.0_PREVIEW')
+        let rsi_stockLocation = path.join('C:','Program Files','Roberts Space Industries','StarCitizen','LIVE')
         let rsi_path = path.normalize(rsi_stockLocation)
         const files = fs.readdirSync(rsi_path);
         let rsi_savedMappings = null

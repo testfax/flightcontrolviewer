@@ -1,6 +1,6 @@
 const { app, BrowserWindow } = require('electron')
 const {logs,logs_error,logs_debug} = require('./logConfig')
-const Store = require('electron-store');
+const Store = require('electron-store').default
 const store = new Store({ name: 'electronWindowIds'})
 const path = require('path')
 const fs = require('fs')
@@ -139,14 +139,23 @@ const util = {
             })
         }
     },
-    windowPosition: function(win,init) { 
+    windowPosition: function(win,init) {
+        
         //Since the intent is to get the window Size and Position, lets call the function that validates the path of the lounge-client.json
         //After that is received, lets call the Store function to get the contents of that file.
         //Then, once you receive the result from getting the contents of the lounge-client.json
         //Update the object with what you want and then send it back as instructions, the function expects an object once you send it.
-        let result = store.get("windowPosition")
-
+        let result = store.get("windowPosition") || {}
+        function saveWindowPosition() {
+            const moved = win.getPosition()
+            const resized = win.getSize()
+            result["clientPosition"] = moved 
+            result["clientSize"] = resized
+            store.set("windowPosition",result)
+        }
         if (!result.hasOwnProperty('clientSize')) { 
+            // return {moveTo:[700,100], resizeTo:[600,600]}
+            saveWindowPosition()
             return {moveTo:[700,100], resizeTo:[366,600]}
         }
         if (init) {
@@ -154,19 +163,15 @@ const util = {
             const moveTo = result.clientPosition; const resizeTo = result.clientSize;
             return { moveTo, resizeTo }
         }
-        if (result) {
-            const moved = win.getPosition()
-            const resized = win.getSize()
-            result["clientPosition"] = moved 
-            result["clientSize"] = resized
-            store.set("windowPosition",result)
-        }
+        else { saveWindowPosition() }
+        
+        
     },
     client_path: function(request) {
         // if (util.watcherConsoleDisplay('client_path') && request) {
         //     logs_debug("[UTIL]".green,"client_path:".blue,request);
         // }
-        let rsi_stockLocation = path.join('C:','Program Files','Roberts Space Industries','StarCitizen','4.0_PREVIEW')
+        let rsi_stockLocation = path.join('C:','Program Files','Roberts Space Industries','StarCitizen','LIVE')
         let rsi_path = path.normalize(rsi_stockLocation)
         const files = fs.readdirSync(rsi_path);
         let rsi_savedMappings = null

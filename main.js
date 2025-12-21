@@ -4,7 +4,7 @@ if (logs) { main(); }
 function main() {
   try {
     const { dialog, nativeTheme, webContents, app, BrowserWindow, ipcMain, Menu } = require('electron')
-    const Store = require('electron-store');
+    const Store = require('electron-store').default
     const path = require('path')
     const fs = require('fs')
     

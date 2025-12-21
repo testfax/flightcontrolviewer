@@ -4,7 +4,7 @@ try {
   const throttle = require('lodash.throttle');
   const { blastToUI } = require('../brain/input-functions')
   const { app, ipcMain, BrowserWindow, webContents  } = require('electron');
-  const Store = require('electron-store');
+  const Store = require('electron-store').default
   const windowItemsStore = new Store({ name: 'electronWindowIds'})
   const actionmaps = new Store({ name: 'actionmapsJSON'})
   const deviceStateData = new Store({ name: "deviceInfo" });
@@ -139,7 +139,6 @@ try {
       return 0 
     }
   }
-
   //!Startup Variables!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   let devices = HID.devices()
   /**
@@ -205,6 +204,7 @@ try {
   }
   ZeroDeviceSetup(deviceSetup,foundDevices,devicesRequested,deviceInit,bufferVals)
   function ZeroDeviceSetup(deviceSetup,foundDevices,devicesRequested,deviceInit,bufferVals) {
+    console.log("Found Devcies".yellow,foundDevices)
     for (const key of Object.keys(foundDevices)) { deviceSetup[key] = 0 }
     const keys = Object.keys(foundDevices)
     keys.forEach(jsId => {
