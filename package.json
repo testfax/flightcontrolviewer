@@ -28,6 +28,9 @@
         "AppImage",
         "snap",
         "portable"
+      ],
+      "extraResources": [
+      { "from": "helpers", "to": "helpers" }
       ]
     },
     "files": [
@@ -59,6 +62,7 @@
     "electron-store": "^11.0.2",
     "electron-updater": "^6.3.0",
     "fs": "^0.0.1-security",
+    "hid-desc": "^0.0.2",
     "json-colorizer": "^3.0.1",
     "lodash.throttle": "^4.1.1",
     "node-hid": "^3.1.0",
