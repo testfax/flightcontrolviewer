@@ -29,6 +29,7 @@ try {
             })
         })
         evaluateActionmaps()
+        
         async function evaluateActionmaps() {
             const stat = await convertXML(client_path().rsi_actionmaps)
             if (stat == true) {

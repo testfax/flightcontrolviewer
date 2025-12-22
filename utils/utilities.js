@@ -9,7 +9,43 @@ const windowItemsStore = new Store({ name: 'electronWindowIds'})
 const showConsoleMessages = windowItemsStore.get('showConsoleMessages')
 const xml2js = require('xml2js')
 
-const util = {
+const util = { 
+    formatJsonObject: function(obj, indent) {
+        indent = indent || 0
+        var spaces = ''
+        for (var i = 0; i < indent; i++) spaces += ' '
+
+        if (Array.isArray(obj)) {
+            if (obj.every(function(v){ return v && v.rank_name && v.id })) {
+                var items = obj.map(function(item){
+                    return spaces + '    ' + JSON.stringify({ rank_name: item.rank_name, id: item.id })
+                })
+                return '[\n' + items.join(',\n') + '\n' + spaces + ']'
+            } else {
+                var items = obj.map(function(item){
+                    return util.formatJsonObject(item, indent + 2)
+                })
+                var paddedItems = items.map(function(i){
+                    var pad = ''
+                    for (var j = 0; j < indent/2 + 1; j++) pad += '  '
+                    return pad + i
+                })
+                return '[\n' + paddedItems.join(',\n') + '\n' + spaces + ']'
+            }
+        } else if (obj && typeof obj === 'object') {
+            var entries = Object.entries(obj).map(function(entry){
+                var key = entry[0]
+                var val = entry[1]
+                var keyValString = JSON.stringify(key) + ': ' + util.formatJsonObject(val, indent + 2)
+                return spaces + '  ' + keyValString
+            })
+            return '{\n' + entries.join(',\n') + '\n' + spaces + '}'
+        } else if (typeof obj === 'string') {
+            return JSON.stringify(obj)
+        } else {
+            return String(obj)
+        }
+    },
     convertXML: async(path) => {
         try {
             if (showConsoleMessages) { logs_debug("[XML]".bgYellow,"Reading actionsmap.xml") }

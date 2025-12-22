@@ -13,6 +13,7 @@ function main() {
     const { windowPosition, autoUpdater } = require('./utils/utilities')
     const electronWindowIds = new Store({ name: "electronWindowIds" })
     const deviceInfo = new Store({ name: "deviceInfo" })
+    deviceInfo.set('devices', {})
     electronWindowIds.set('currentPage','dashboard')
     if (!electronWindowIds.get('theme')) {
       electronWindowIds.set('theme','dark')
@@ -31,59 +32,16 @@ function main() {
       })
     }
 
-
-    // Step 2.4 / 2.5 (helper path + run helper)
     function getWinHidDumpPath() {
       // DEV: <projectRoot>\helpers\win\win-hid-dump.exe
       // PACKAGED: <install>\resources\helpers\win\win-hid-dump.exe (extraResources -> process.resourcesPath)
       const base = app.isPackaged ? process.resourcesPath : process.cwd()
       return path.join(base, 'helpers', 'winhiddump', 'winhiddump.exe')
     }
-
     function runWinHidDump() {
       const exePath = getWinHidDumpPath()
       return execFileSync(exePath, [], { encoding: 'utf8', windowsHide: true })
     }
-
-    // function loadBrains() {
-    //     // Contains all ipcRenderer event listeners that must perform a PC related action.
-    //     // Brains Directory: Loop through all files and load them.
-    //     let brainsDirectory = null;
-    //     if (app.isPackaged) {
-    //         brainsDirectory = path.join(process.cwd(),'resources','app','brain')
-    //     }
-    //     else {
-    //         brainsDirectory = path.join(process.cwd(),'brain')
-    //     }
-    //     fs.readdir(brainsDirectory, (err, files) => {
-    //         if (err) {
-    //             logs(err)
-    //             return;
-    //         }
-    //         files.forEach((file,index) => {
-    //             index++
-    //             if ()
-    //             const filePath = path.join(brainsDirectory, file);
-    //             fs.stat(filePath, (err, stats) => {
-    //                 if (err) {
-    //                     logs(err)
-    //                 return;
-    //                 }
-    //                 if (stats.isFile()) {
-    //                     logs('[BRAIN]'.bgCyan,"File:", `${file}`.magenta);
-    //                     try {  require(filePath) }
-    //                     catch(e) { console.log(e); }
-    //                 if (files.length == index) { 
-    //                     // const loadTime = (Date.now() - appStartTime) / 1000;
-    //                     // if (watcherConsoleDisplay("globalLogs")) { logs("App-Initialization-Timer".bgMagenta,loadTime,"Seconds") }
-    //                 }
-    //                 } else if (stats.isDirectory()) {
-    //                     logs(`Directory: ${file}`);
-    //                 }
-    //             });
-    //         });
-    //     });
-    // }
     function loadBrains() {
       // Contains all ipcRenderer event listeners that must perform a PC related action.
       // Brains Directory: Loop through all files and load them.
@@ -243,7 +201,8 @@ function main() {
       //  logs('ReferenceError occurred:'.red, error.stack);
     })
     .on('unhandledRejection', (error, origin) => {
-      logs_error(error,origin)
+      logs_error(error,origin,error.stack)
+      
     })
     .on('TypeError', (error,origin) => {
       logs_error(error,origin)

@@ -158,13 +158,15 @@ try {
             log.info(logMessage);
         },
         logs_error: async (...input) => {
-            let logMessage = input.map(item => {
-                if (typeof item === 'object') {
-                    return colorizeJSON(JSON.stringify(item, null, 2));
-                } else {
-                    return item;
-                }
-            }).join(' ');
+            const err = await input[0]
+            const serializeError = err => ({
+                name: err.name,
+                message: err.message,
+                stack: err.stack,
+                cause: err.cause ? serializeError(err.cause) : undefined
+            })
+            serializeError(err)
+            const logMessage = colorizeJSON(JSON.stringify(serializeError(err), null, 2))
             log.error(logMessage)
         },
         logs_debug: async (...input) => {
