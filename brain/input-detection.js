@@ -768,7 +768,6 @@ function initializeUI(data, receiver) {
     let sortedPackage = Object.values(package)
       .sort((a, b) => a.position - b.position)
     sortedPackage['receiver'] = receiver
-    
     blastToUI(sortedPackage)
   }
 }

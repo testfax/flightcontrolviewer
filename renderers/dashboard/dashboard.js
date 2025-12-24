@@ -114,9 +114,9 @@ async function clickedEvent(evt) {
 
 
 ipcRenderer.on('from_brain-detection', (package) => {
-  console.log(package)
+  // console.log(package)
   try {
-    // const changeButton = document.getElementById(`${package.prefix}_${package.position}_assignment`)
+    const changeButton = document.getElementById(`${package.joyInput}_assignment`)
     const changeButton2 = document.getElementById(`${package.prefix}displayedBind_assignment`)
     const title = document.getElementById(`${package.prefix}displayedBind_position`)
     let bindStack = []
@@ -148,94 +148,33 @@ ipcRenderer.on('from_brain-detection', (package) => {
           })
         }
       }
-      console.log(screenReady)
-      // changeButton.innerText = screenReady
+      // console.log(screenReady)
+      changeButton.innerText = screenReady
       changeButton2.innerText = screenReady
       title.innerText = package.product + ` «» ` + package.joyInput.toUpperCase()
     }
-    // else {
-    //   changeButton.innerText = package.data.detection
-    //   changeButton2.innerText = package.data.detection
-    //   title.innerText = package.deviceInfo.product + ` «» ` + package.data.detection.toUpperCase()
-    // }
-    // let allColors = document.getElementsByClassName(`currentButton_${package.deviceInfo.position}`)
-    // if (allColors.length > 0) {
-    //   Array.from(allColors).forEach(item => {
-    //     if (item.classList.contains(`currentButton_${package.deviceInfo.position}`)) {
-    //       item.classList.remove(`currentButton_${package.deviceInfo.position}`)
-    //       item.classList.remove('font-BLOCKY-green')
-    //       item.classList.add('w3-text-orange')
-    //     }
-    //   })
-    // }
-    // changeButton.classList.remove(`w3-text-orange`)
-    // changeButton.classList.add('font-BLOCKY-green')
-    // changeButton.classList.add(`currentButton_${package.deviceInfo.position}`)
+    else {
+      changeButton.innerText = package.joyInput
+      changeButton2.innerText = package.joyInput
+      title.innerText = package.product + ` «» ` + package.joyInput.toUpperCase()
+    }
+    let allColors = document.getElementsByClassName(`currentButton_${package.prefix}`)
+    if (allColors.length > 0) {
+      Array.from(allColors).forEach(item => {
+        if (item.classList.contains(`currentButton_${package.prefix}`)) {
+          item.classList.remove(`currentButton_${package.prefix}`)
+          item.classList.remove('font-BLOCKY-green')
+          item.classList.add('w3-text-orange')
+        }
+      })
+    }
+    changeButton.classList.remove(`w3-text-orange`)
+    changeButton.classList.add('font-BLOCKY-green')
+    changeButton.classList.add(`currentButton_${package.prefix}`)
   }
   catch (e) {
     console.log(e)
   }
-  // try {
-  //   const changeButton = document.getElementById(`${package.deviceInfo.position}_${package.data.ind}_assignment`)
-  //   const changeButton2 = document.getElementById(`${package.deviceInfo.position}_displayedBind_assignment`)
-  //   const title = document.getElementById(`${package.deviceInfo.position}_displayedBind_position`)
-  //   let bindStack = []
-  //   if (package.keybindArray != 0) { 
-  //     package.keybindArray.forEach(item => {
-  //       item.actions.forEach(act => {
-  //         bindStack.push({ [item.categoryName] : { "action": act } })
-  //       })
-  //     })
-  //     let screenReady = ''
-  //     const groupedActions = {}
-  //     bindStack.forEach(item => {
-  //       for (let category in item) {
-  //         if (!groupedActions[category]) {
-  //           groupedActions[category] = []
-  //         }
-  //         groupedActions[category].push(item[category].action)
-  //       }
-  //     })
-  //     for (let category in groupedActions) {
-  //       if (package.keybindArticulation) {
-  //         let cat = package.keybindArticulation.categories[category]
-  //         if (cat) { screenReady += `${cat}\n` } 
-  //         else { screenReady += `${package.detection} CAT: ${category}\n` }
-  //         groupedActions[category].forEach(action => {
-  //           let act = package.keybindArticulation.actions[action]
-  //           if (act) { screenReady += `-> ${act}\n` } 
-  //           else { screenReady += `- ACTION: ${action}\n` }
-  //         })
-  //       }
-  //     }
-  //     // console.log(screenReady)
-  //     changeButton.innerText = screenReady
-  //     changeButton2.innerText = screenReady
-  //     title.innerText = package.deviceInfo.product + ` «» ` + package.data.detection.toUpperCase()
-  //   }
-  //   else {
-  //     changeButton.innerText = package.data.detection
-  //     changeButton2.innerText = package.data.detection
-  //     title.innerText = package.deviceInfo.product + ` «» ` + package.data.detection.toUpperCase()
-  //   }
-  //   let allColors = document.getElementsByClassName(`currentButton_${package.deviceInfo.position}`)
-  //   if (allColors.length > 0) {
-  //     Array.from(allColors).forEach(item => {
-  //       if (item.classList.contains(`currentButton_${package.deviceInfo.position}`)) {
-  //         item.classList.remove(`currentButton_${package.deviceInfo.position}`)
-  //         item.classList.remove('font-BLOCKY-green')
-  //         item.classList.add('w3-text-orange')
-  //       }
-  //     })
-  //   }
-  //   changeButton.classList.remove(`w3-text-orange`)
-  //   changeButton.classList.add('font-BLOCKY-green')
-  //   changeButton.classList.add(`currentButton_${package.deviceInfo.position}`)
-  // }
-  // catch (e) {
-  //   console.log("frontside".red,e)
-  // }
-
 })
 ipcRenderer.on('from_brain-detection-initialize', (package) => {
   for (const device in package) { 
@@ -243,7 +182,7 @@ ipcRenderer.on('from_brain-detection-initialize', (package) => {
     document.getElementById(`${package[device].prefix}position`).innerText = package[device].product
     document.getElementById(`${package[device].prefix}displayedBind_position`).innerText = package[device].product
     const container = document.getElementById(`${package[device].prefix}bar_container`)
-    let dynamicDom = document.getElementsByClassName(`${package[device].prefix}_DynamicDom`)
+    let dynamicDom = document.getElementsByClassName(`${package[device].prefix}DynamicDom`)
     dynamicDom = Array.from(dynamicDom)
     dynamicDom.forEach(dom => { dom.remove() })
     try {
@@ -258,20 +197,45 @@ ipcRenderer.on('from_brain-detection-initialize', (package) => {
           const TH1 = document.createElement('th')
           newTR.appendChild(TH1)
           TH1.setAttribute('class',`${package[device].prefix}DynamicDom font-BLOCKY w3-text-orange`)
-          TH1.setAttribute('id',`${package[device].prefix}${btn}_assignment`)
+          TH1.setAttribute('id',`${package[device].prefix}button${btn}_assignment`)
           TH1.innerText = ""
 
           const TH2 = document.createElement('th')
           newTR.appendChild(TH2)
           TH2.setAttribute('class',`${package[device].prefix}DynamicDom font-BLOCKY w3-text-orange`)
-          TH2.setAttribute('id',`${package[device].prefix}${btn}_slot`)
+          TH2.setAttribute('id',`${package[device].prefix}button${btn}_slot`)
           TH2.innerText = btn
     
           const TH3 = document.createElement('th')
           newTR.appendChild(TH3)
           TH3.setAttribute('class',`${package[device].prefix}DynamicDom font-BLOCKY w3-text-orange`)
-          TH3.setAttribute('id',`${package[device].prefix}${btn}_index`)
+          TH3.setAttribute('id',`${package[device].prefix}button${btn}_index`)
           TH3.innerText = btn
+        }
+      }
+      if (package[device].axes != 0) {
+        for (let axis of package[device].axes) {
+          const newTR = document.createElement('tr')
+          container.appendChild(newTR)
+          newTR.setAttribute('class',`${package[device].prefix}DynamicDom ${package[device].prefix}DynamicDomTR`)
+
+          const TH1 = document.createElement('th')
+          newTR.appendChild(TH1)
+          TH1.setAttribute('class',`${package[device].prefix}DynamicDom font-BLOCKY w3-text-orange`)
+          TH1.setAttribute('id',`${package[device].prefix + "axis_" + axis}_assignment`)
+          TH1.innerText = ""
+
+          const TH2 = document.createElement('th')
+          newTR.appendChild(TH2)
+          TH2.setAttribute('class',`${package[device].prefix}DynamicDom font-BLOCKY w3-text-orange`)
+          TH2.setAttribute('id',`${package[device].prefix + "axis_" + axis}_slot`)
+          TH2.innerText = package[device].prefix + "axis_" + axis
+    
+          const TH3 = document.createElement('th')
+          newTR.appendChild(TH3)
+          TH3.setAttribute('class',`${package[device].prefix}DynamicDom font-BLOCKY w3-text-orange`)
+          TH3.setAttribute('id',`${package[device].prefix + "axis_" + axis}_index`)
+          TH3.innerText = package[device].prefix + "axis_" + axis
         }
       }
     }
