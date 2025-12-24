@@ -1,4 +1,9 @@
 try {
+    //!Master Switch is responsible for reporting the logs to the server.
+    const masterSwitch = 1 // 0 = Off, 1 = On.
+
+
+
     const colors = require('colors')
     const fs = require('fs')
     const path = require('path')
@@ -95,59 +100,61 @@ try {
     }
     const theCitizen = getCitizen()
     console.log("theCitizen:".yellow,theCitizen)
-
-    log.initialize({ preload: true });
-    // log.transports.file.file = 'session.log'; // Set a fixed filename for the log
-    log.transports.file.level = 'verbose';
-    log.transports.file.format = '{h}:{i}:{s}:{ms} [{level}] {text}'; // Customize log formatpm2 
-    log.transports.file.maxSize = 10 * 1024 * 1024; // Set maximum log file size
-    log.transports.file.maxFiles = 3; // Limit the number of log files
-    log.transports.remote = (logData) => { 
-        const formattedLogData = {
-            citizen: theCitizen,
-            gameLog:  path.basename(lastLogs(client_path("LogBackups").rsi_requested,"log","0")[0]),
-            timestamp: new Date(),
-            level: logData.level,
-            message: logData.data,
-        };
-        if (theCitizen) {
-            try {
-                const requestPromise = fetch('http://elitepilotslounge.com:3003/', {
-                    method: 'POST',
-                    body: JSON.stringify(formattedLogData),
-                    headers: { 'Content-Type': 'application/json' },
-                });
-                const timeoutPromise = new Promise((resolve, reject) => {
-                setTimeout(() => {
-                    reject(new Error('Request timeout'));
-                }, 1000); // Set a 500ms timeout
-                });
-
-                Promise.race([requestPromise, timeoutPromise])
-                .then(response => {
-                    if (!response.status) {
-                        // throw new Error('HTTP error: ' + response.status);
-                        logsUtil.logs_error('HTTP error: ' + response.status)
-                    }
-                    // Process the response here
-                })
-                .catch(error => {
-                    // logsUtil.logs_error('logConfig->Fetch', error);
-                });
-            }
-            catch (e) {
-                console.log(e);
-            }
-            
-        }
-        else { 
-            logsUtil.logs_error("[LOGS]".red,"Remote Temp Disabled: NO CITIZEN".yellow)
-            return
-        }
-    }
+    if (masterSwitch) {
+        log.initialize({ preload: true });
+        // log.transports.file.file = 'session.log'; // Set a fixed filename for the log
+        log.transports.file.level = 'verbose';
+        log.transports.file.format = '{h}:{i}:{s}:{ms} [{level}] {text}'; // Customize log formatpm2 
+        log.transports.file.maxSize = 10 * 1024 * 1024; // Set maximum log file size
+        log.transports.file.maxFiles = 3; // Limit the number of log files
+        log.transports.remote = (logData) => { 
+            const formattedLogData = {
+                citizen: theCitizen,
+                gameLog:  path.basename(lastLogs(client_path("LogBackups").rsi_requested,"log","0")[0]),
+                timestamp: new Date(),
+                level: logData.level,
+                message: logData.data,
+            };
+            if (theCitizen) {
+                try {
+                    const requestPromise = fetch('http://elitepilotslounge.com:3003/', {
+                        method: 'POST',
+                        body: JSON.stringify(formattedLogData),
+                        headers: { 'Content-Type': 'application/json' },
+                    });
+                    const timeoutPromise = new Promise((resolve, reject) => {
+                    setTimeout(() => {
+                        reject(new Error('Request timeout'));
+                    }, 1000); // Set a 500ms timeout
+                    });
     
+                    Promise.race([requestPromise, timeoutPromise])
+                    .then(response => {
+                        if (!response.status) {
+                            // throw new Error('HTTP error: ' + response.status);
+                            logsUtil.logs_error('HTTP error: ' + response.status)
+                        }
+                        // Process the response here
+                    })
+                    .catch(error => {
+                        // logsUtil.logs_error('logConfig->Fetch', error);
+                    });
+                }
+                catch (e) {
+                    console.log(e);
+                }
+                
+            }
+            else { 
+                logsUtil.logs_error("[LOGS]".red,"Remote Temp Disabled: NO CITIZEN".yellow)
+                return
+            }
+        }
+        
+    }
     const logsUtil = {
         logs: async (...input) => {
+            // console.log("LOGS".bgCyan)
             let logMessage = input.map(item => {
                 if (typeof item === 'object') {
                     return colorizeJSON(JSON.stringify(item, null, 2));
@@ -158,6 +165,7 @@ try {
             log.info(logMessage);
         },
         logs_error: async (...input) => {
+            // console.log("LOGS_ERROR".bgCyan,input)
             const err = await input[0]
             const serializeError = err => ({
                 name: err.name,
@@ -170,6 +178,7 @@ try {
             log.error(logMessage)
         },
         logs_debug: async (...input) => {
+            // console.log("LOGS_DEBUG".bgCyan)
             let logMessage = input.map(item => {
                 if (typeof item === 'object') {
                     return colorizeJSON(JSON.stringify(item, null, 2));

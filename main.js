@@ -13,7 +13,8 @@ function main() {
     const { windowPosition, autoUpdater } = require('./utils/utilities')
     const electronWindowIds = new Store({ name: "electronWindowIds" })
     const deviceInfo = new Store({ name: "deviceInfo" })
-    deviceInfo.set('devices', {})
+    //! RESETS DEVICES TO DETECT NEW DEVICES
+    // deviceInfo.set('devices', {})
     electronWindowIds.set('currentPage','dashboard')
     if (!electronWindowIds.get('theme')) {
       electronWindowIds.set('theme','dark')
@@ -101,7 +102,8 @@ function main() {
     const isNotDev = app.isPackaged
     let appStartTime = null
     let win = null
-
+    app.commandLine.appendSwitch('disable-logging')
+    app.commandLine.appendSwitch('log-level', '3') 
     app.on('ready', () => {
       // Run win-hid-dump automatically before creating window
       try {
@@ -154,7 +156,7 @@ function main() {
           win.setPosition(windowPositionz.moveTo[0],windowPositionz.moveTo[1])
           win.setSize(windowPositionz.resizeTo[0],windowPositionz.resizeTo[1])
           win.show()
-          // if (!isNotDev) { win.webContents.openDevTools() }
+          if (!isNotDev) { win.webContents.openDevTools() }
 
           appStartTime = Date.now()
           loadBrains()

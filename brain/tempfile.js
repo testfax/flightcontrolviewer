@@ -86,7 +86,7 @@
 //       console.log(e)
 //     }
 //     //
-//     joystickAxes.forEach(index => {
+//     joystickAxes.forEach(index => {initializer-response
 //       const bufferValue = buffer[index]
 //       if (bufferValue !== undefined && bufferValue !== medianDistance) {
 //         const axisName = joystickAxisNames[index]

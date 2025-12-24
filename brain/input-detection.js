@@ -1,5 +1,5 @@
+const {logs,logs_error,logs_debug} = require('../utils/logConfig')
 const HID = require('node-hid')
-const throttle = require('lodash.throttle')
 const { blastToUI } = require('../brain/input-functions')
 const { app, ipcMain, BrowserWindow, webContents } = require('electron')
 const Store = require('electron-store').default
@@ -7,7 +7,8 @@ const deviceInfo = new Store({ name: 'deviceInfo' })
 const windowItemsStore = new Store({ name: 'electronWindowIds' })
 const actionmaps = new Store({ name: 'actionmapsJSON' })
 const showConsoleMessages = windowItemsStore.get('showConsoleMessages')
-const thisWindow = windowItemsStore.get('electronWindowIds')
+const staticData = require('../staticData.json')
+// const thisWindow = windowItemsStore.get('electronWindowIds')
 
 function toHex4(n) {
   return Number(n).toString(16).toUpperCase().padStart(4, '0')
@@ -455,72 +456,13 @@ function learnAndPersistDevice(d, dumpText) {
     savedAt: Math.floor(Date.now() / 1000)
   }
 
-  console.log('Learned Device:'.cyan, devices[key].product)
+  if (showConsoleMessages) { console.log('Learned Device:'.cyan, devices[key].product) }
+  logs('[BRAIN]'.bgCyan, 'input-detection'.yellow, 'Learned Device:'.cyan, devices[key].product)
   setDevicesStore(devices)
   return parsed
 }
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
-}
-async function main() {
-  const devices = listAllJoysticks()
-  if (!devices.length) {
-    console.log('[input-detection] No joystick-class devices found (usagePage=1 usage=4)')
-    return
-  }
-
-  const dumpStatus = deviceInfo.get('hidDescriptorDumpStatus')
-  const dumpText = deviceInfo.get('hidDescriptorDump')
-  const dumpAvailable = (dumpStatus && dumpStatus.ok === 1 && dumpText)
-
-  const stored = getDevicesStore()
-
-  for (const d of devices) {
-    const key = deviceKeyFromHidInfo(d)
-    getOrAssignJsIndexForKey(key)
-    const entry = stored[key]
-
-    if (entry && entry.parsedInputs) {
-      deviceInit.push(entry)
-      if (entry.path !== d.path) {
-        entry.path = d.path
-        entry.savedAt = Math.floor(Date.now() / 1000)
-        stored[key] = entry
-        setDevicesStore(stored)
-      }
-      const parsed = plainToInputsMaps(entry.parsedInputs)
-      startInputLoggerForDevice(d, parsed)
-      continue
-    }
-
-    if (!dumpAvailable) {
-      const prefix = jsPrefixForDevice(d)
-      if (showConsoleMessages) { console.log(prefix + 'unlearned_no_dump') }
-      continue
-    }
-
-    const prefix = jsPrefixForDevice(d)
-    let learned = null
-    let tries = 0
-
-    while (!learned && tries < 5) {
-      tries += 1
-      if (showConsoleMessages) { console.log(prefix + `learn_attempt_${tries}`.yellow) }
-      learned = learnAndPersistDevice(d, dumpText)
-      if (!learned && tries < 5) {
-        await sleep(1000)
-      }
-    }
-
-    if (!learned) {
-      if (showConsoleMessages) { console.log(prefix + `unlearned_descriptor_failed_after_${tries}_tries`.red) }
-      continue
-    }
-
-    if (showConsoleMessages) { console.log(prefix + `learned_after_${tries}_tries`.green) }
-
-    startInputLoggerForDevice(d, learned)
-  }
 }
 function startInputLoggerForDevice(d, parsed) {
   correctControls()
@@ -529,7 +471,8 @@ function startInputLoggerForDevice(d, parsed) {
   try {
     device = new HID.HID(d.path)
   } catch (e) {
-    console.error(prefix + 'open_failed', d.path)
+    logs_error(prefix + 'open_failed', d.path)
+    // console.error(prefix + 'open_failed', d.path)
     return
   }
 
@@ -583,7 +526,8 @@ function startInputLoggerForDevice(d, parsed) {
 
       if (axes.length) {
         const names = axes.map(x => x.name).join(',')
-        console.log(prefix + `axes_rid${rid}=` + names, 'loaded'.green)
+        if (showConsoleMessages) { console.log(prefix + `axes_rid${rid}=` + names, 'loaded'.green) }
+        logs('[BRAIN]'.bgCyan, 'input-detection'.yellow, prefix + `axes_rid${rid}=` + names, 'loaded'.green)
       }
 
       warmed.add(rid)
@@ -599,8 +543,8 @@ function startInputLoggerForDevice(d, parsed) {
       if (down && !prev) {
         const out = `${prefix}button${b.usage}`
         if (reportOnce(out)) {
-          console.log(out.blue)
-          gatherAfterJoyMoveButton(out)
+          if (showConsoleMessages) { console.log(out.blue) }
+          gatherAfterDeviceInputs(out,d.product)
         }
       }
 
@@ -636,14 +580,14 @@ function startInputLoggerForDevice(d, parsed) {
         if (!wasActive && isActive) {
           const out = `${prefix}axis_${a.name}`
           if (reportOnce(out)) {
-            console.log(out.cyan)
+            if (showConsoleMessages) { console.log(out.cyan) }
           }
           axisLastEmit.set(key, now)
         } else if (movedEnough && (now - lastEmit) >= AXIS_COOLDOWN_MS) {
           const out = `${prefix}axis_${a.name}`
           if (reportOnce(out)) {
-            console.log(out.red)
-            gatherAfterJoyMoveButton(out)
+            if (showConsoleMessages) { console.log(out.red) }
+            gatherAfterDeviceInputs(out,d.product)
           }
           axisLastEmit.set(key, now)
         }
@@ -654,7 +598,8 @@ function startInputLoggerForDevice(d, parsed) {
   })
 
   device.on('error', (err) => {
-    console.error(prefix + 'hid_error', err && err.stack ? err.stack : err)
+    // console.error(prefix + 'hid_error', err && err.stack ? err.stack : err)
+    logs_error(err)
   })
 }
 function findKeybind(key, discoveredKeybinds) {
@@ -667,19 +612,7 @@ function findKeybind(key, discoveredKeybinds) {
     return 0
   }
 }
-function initializeUI(data, deviceInfo, receiver) {
-  if (windowItemsStore.get('currentPage') == 'dashboard' || windowItemsStore.get('currentPage') == 'joyview') {
-    const package = {
-      data: data,
-      deviceInfo: deviceInfo
-    }
-    deviceSetup[deviceInfo]
-    const client = BrowserWindow.fromId(thisWindow.win)
-    if (client) { client.webContents.send(receiver, package) }
-    else { logs_error('no client') }
-  }
-}
-function gatherAfterJoyMoveButton(data) {
+function gatherAfterDeviceInputs(data,product) {
   const joyInfo = data.split('_')
   let result
   if (joyInfo[1] == 'axis') {
@@ -687,7 +620,15 @@ function gatherAfterJoyMoveButton(data) {
   } else {
     result = findKeybind(`${joyInfo[0]}_${joyInfo[1]}`, actionmaps.get('discoveredKeybinds'))
   }
-  joySubmit(result)
+  const deviceSpecs = {
+    joyInput: data,
+    product: product,
+    keybindArray: result,
+    position: joyInfo[0].slice(-1),
+    prefix: joyInfo[0] + "_",
+    keybindArticulation: staticData.keybindArticulation
+  }
+  joySubmit(deviceSpecs)
 }
 function correctControls() {
   const controlStuff = actionmaps.get('actionmaps')
@@ -722,7 +663,8 @@ function correctControls() {
             break
         }
 
-        console.log('Devices Reordered...'.green, devices[deviceKey].product, devices[deviceKey].prefix, devices[deviceKey].jsIndex)
+        if (showConsoleMessages) { console.log('Devices Reordered...'.green, devices[deviceKey].product, devices[deviceKey].prefix, devices[deviceKey].jsIndex) }
+        // logs('[BRAIN]'.bgCyan, 'input-detection'.yellow, 'Devices Reordered...'.green, devices[deviceKey].product, devices[deviceKey].prefix, devices[deviceKey].jsIndex)
         devices[deviceKey].savedAt = Math.floor(Date.now() / 1000)
       }
     }
@@ -730,14 +672,130 @@ function correctControls() {
   setDevicesStore(devices)
 }
 function joySubmit(data) {
-  console.log(data)
+  if (showConsoleMessages) { console.log(data) }
+  let package = {}
+  package = { 
+    ...data, 
+    ...{receiver: "from_brain-detection"},
+  }
+  // console.log("package:".yellow,package)
+  blastToUI(package)
 }
+async function main() {
+  const devices = listAllJoysticks()
+  if (!devices.length) {
+    console.log('[input-detection] No joystick-class devices found (usagePage=1 usage=4)')
+    logs('[BRAIN]'.bgCyan, 'input-detection'.yellow, '[input-detection] No joystick-class devices found (usagePage=1 usage=4)'.yellow)
+    return
+  }
 
+  const dumpStatus = deviceInfo.get('hidDescriptorDumpStatus')
+  const dumpText = deviceInfo.get('hidDescriptorDump')
+  const dumpAvailable = (dumpStatus && dumpStatus.ok === 1 && dumpText)
+
+  const stored = getDevicesStore()
+
+  for (const d of devices) {
+    const key = deviceKeyFromHidInfo(d)
+    getOrAssignJsIndexForKey(key)
+    const entry = stored[key]
+
+    if (entry && entry.parsedInputs) {
+      deviceInit.push(entry)
+      if (entry.path !== d.path) {
+        entry.path = d.path
+        entry.savedAt = Math.floor(Date.now() / 1000)
+        stored[key] = entry
+        setDevicesStore(stored)
+      }
+      const parsed = plainToInputsMaps(entry.parsedInputs)
+      startInputLoggerForDevice(d, parsed)
+      continue
+    }
+
+    if (!dumpAvailable) {
+      const prefix = jsPrefixForDevice(d)
+      if (showConsoleMessages) { console.log(prefix + 'unlearned_no_dump') }
+      logs('[BRAIN]'.bgCyan, 'input-detection'.yellow, prefix + 'unlearned_no_dump'.red)
+      continue
+    }
+
+    const prefix = jsPrefixForDevice(d)
+    let learned = null
+    let tries = 0
+
+    while (!learned && tries < 5) {
+      tries += 1
+      if (showConsoleMessages) { console.log(prefix + `learn_attempt_${tries}`.yellow) }
+      logs('[BRAIN]'.bgCyan, 'input-detection'.yellow, prefix + `learn_attempt_${tries}`.yellow)
+      learned = learnAndPersistDevice(d, dumpText)
+      if (!learned && tries < 5) {
+        await sleep(1000)
+      }
+    }
+
+    if (!learned) {
+      if (showConsoleMessages) { console.log(prefix + `unlearned_descriptor_failed_after_${tries}_tries`.red) }
+       logs('[BRAIN]'.bgCyan, 'input-detection'.yellow, `unlearned_descriptor_failed_after_${tries}_tries`.red)
+      continue
+    }
+
+    if (showConsoleMessages) { console.log(prefix + `learned_after_${tries}_tries`.green) }
+
+    startInputLoggerForDevice(d, learned)
+  }
+  initializeUI(getDevicesStore(),"from_brain-detection-initialize")
+}
+function initializeUI(data, receiver) {
+  if (windowItemsStore.get('currentPage') == 'dashboard' || windowItemsStore.get('currentPage') == 'joyview') {
+    let package = {}
+    for (const item in data) {
+      if (!data[item].product) continue
+      const prod = data[item].key
+      const parsed = data[item].parsedInputs
+      if (!package[prod]) {
+        package[prod] = {
+          product: data[item].product,
+          prefix: data[item].prefix,
+          position: data[item].jsIndex,
+          buttons:  data[item].parsedInputs.buttonsByReport['1']?.length || 0,
+          axes: []
+        }
+      }
+      const axesArr = parsed.axesByReport?.['1'] || []
+      package[prod].axes = axesArr.map(a => a.name)
+    }
+    let sortedPackage = Object.values(package)
+      .sort((a, b) => a.position - b.position)
+    sortedPackage['receiver'] = receiver
+    
+    blastToUI(sortedPackage)
+  }
+}
 let deviceInit = []
 let init = 1
 setTimeout(() => {
   init = 0
   console.log('=== Ready to Receive Inputs ==='.green)
 }, 2000)
-
 main()
+
+ipcMain.on('changePage', async (receivedData) => {
+  main()
+  // deviceInit.forEach(device => device.removeAllListeners())
+  setTimeout(() => {
+      if (showConsoleMessages) { logs_debug("[RENDERER]".bgGreen,"Page Change:".yellow,windowItemsStore.get('currentPage')) }
+      // ZeroDeviceSetup(deviceSetup,foundDevices,devicesRequested,deviceInit,bufferVals)
+  },300)
+})
+ipcMain.on('initializer-response', (event,message) => { 
+    logs_debug("[RENDERER-Init]".bgGreen,message)
+  })
+// if (deviceSetup[jsId] == 0) { initializeUI(buttonArray.bufferDecoded,requestedDevices,"from_brain-detection-initialize"); deviceSetup[jsId] = 1 }
+// const package = {
+//   data: byteArray,
+//   deviceInfo: requestedDevices,
+//   receiver: "from_brain-detection-getbuffer",
+//   keybindArray: 0
+// }
+// blastToUI(package)
