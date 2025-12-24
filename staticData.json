@@ -138,6 +138,8 @@
 			"view_director_mode": "Camera - Advanced Camera Controls"
 		},
 		"actions":{
+			"ready":"",
+			"retry":"",
 			"v_eject":"Eject",
 			"v_emergency_exit":"Emergency Exit Seat",
 			"v_enter_remote_turret_1":"Enter Remote Turret 1",
@@ -685,7 +687,8 @@
 			"view_save_view_7":"Save View 7",
 			"view_save_view_8":"Save View 8",
 			"view_save_view_9":"Save View 9",
-			"view_switch_to_alternative":"Advanced Camera Controls Modifier (Hold)"
+			"view_switch_to_alternative":"Advanced Camera Controls Modifier (Hold)",
+			"flashui_kp_7":"3rd Person Camera"
 		}
 	}
 }

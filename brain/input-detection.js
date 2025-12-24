@@ -1,4 +1,4 @@
-const {logs,logs_error,logs_debug} = require('../utils/logConfig')
+const { logs_warn, logs, logs_error, logs_debug } = require('../utils/logConfig')
 const HID = require('node-hid')
 const { blastToUI } = require('../brain/input-functions')
 const { app, ipcMain, BrowserWindow, webContents } = require('electron')
@@ -8,7 +8,6 @@ const windowItemsStore = new Store({ name: 'electronWindowIds' })
 const actionmaps = new Store({ name: 'actionmapsJSON' })
 const showConsoleMessages = windowItemsStore.get('showConsoleMessages')
 const staticData = require('../staticData.json')
-// const thisWindow = windowItemsStore.get('electronWindowIds')
 
 function toHex4(n) {
   return Number(n).toString(16).toUpperCase().padStart(4, '0')
@@ -184,8 +183,8 @@ function usageName(usagePage, usage) {
       case 0x30: return 'x'
       case 0x31: return 'y'
       case 0x32: return 'z'
-      case 0x33: return 'rx'
-      case 0x34: return 'ry'
+      case 0x33: return 'rotx'
+      case 0x34: return 'roty'
       case 0x35: return 'rz'
       case 0x36: return 'slider'
       case 0x37: return 'dial'
@@ -544,7 +543,7 @@ function startInputLoggerForDevice(d, parsed) {
         const out = `${prefix}button${b.usage}`
         if (reportOnce(out)) {
           if (showConsoleMessages) { console.log(out.blue) }
-          gatherAfterDeviceInputs(out,d.product)
+          gatherAfterDeviceInputs(out,d)
         }
       }
 
@@ -587,7 +586,7 @@ function startInputLoggerForDevice(d, parsed) {
           const out = `${prefix}axis_${a.name}`
           if (reportOnce(out)) {
             if (showConsoleMessages) { console.log(out.red) }
-            gatherAfterDeviceInputs(out,d.product)
+            gatherAfterDeviceInputs(out,d)
           }
           axisLastEmit.set(key, now)
         }
@@ -612,7 +611,16 @@ function findKeybind(key, discoveredKeybinds) {
     return 0
   }
 }
-function gatherAfterDeviceInputs(data,product) {
+function pidVidFromHidPath(path) {
+  if (typeof path !== 'string') return null
+
+  const match = path.match(/VID_([0-9A-Fa-f]{4})&PID_([0-9A-Fa-f]{4})/)
+  if (!match) return null
+
+  const [, vid, pid] = match
+  return `${vid.toUpperCase()}:${pid.toUpperCase()}`
+}
+function gatherAfterDeviceInputs(data,d) {
   const joyInfo = data.split('_')
   let result
   if (joyInfo[1] == 'axis') {
@@ -620,14 +628,20 @@ function gatherAfterDeviceInputs(data,product) {
   } else {
     result = findKeybind(`${joyInfo[0]}_${joyInfo[1]}`, actionmaps.get('discoveredKeybinds'))
   }
+  // console.log(d)
   const deviceSpecs = {
+    key: pidVidFromHidPath(d.path),
     joyInput: data,
-    product: product,
+    product: d.product,
+    vid: d.vendorId,
+    pid: d.productId,
     keybindArray: result,
     position: joyInfo[0].slice(-1),
-    prefix: joyInfo[0] + "_",
+    prefix: joyInfo[0],
     keybindArticulation: staticData.keybindArticulation
   }
+  // console.log("deviceSpecs:".yellow,deviceSpecs.key)
+
   joySubmit(deviceSpecs)
 }
 function correctControls() {
@@ -701,7 +715,13 @@ async function main() {
     const entry = stored[key]
 
     if (entry && entry.parsedInputs) {
-      deviceInit.push(entry)
+      // for (const reportId in entry.parsedInputs.axesByReport) {
+      //   entry.parsedInputs.axesByReport[reportId] = entry.parsedInputs.axesByReport[reportId].map(axis => {
+      //     if (axis.name === 'rx') axis.name = 'rotx'
+      //     else if (axis.name === 'ry') axis.name = 'roty'
+      //     return axis
+      //   })
+      // }
       if (entry.path !== d.path) {
         entry.path = d.path
         entry.savedAt = Math.floor(Date.now() / 1000)
@@ -755,8 +775,11 @@ function initializeUI(data, receiver) {
       const parsed = data[item].parsedInputs
       if (!package[prod]) {
         package[prod] = {
+          key: data[item].key.split("|")[0],
           product: data[item].product,
-          prefix: data[item].prefix,
+          vid: data[item].vendorId,
+          pid: data[item].productId,
+          prefix: data[item].prefix.split("_")[0],
           position: data[item].jsIndex,
           buttons:  data[item].parsedInputs.buttonsByReport['1']?.length || 0,
           axes: []
@@ -768,33 +791,42 @@ function initializeUI(data, receiver) {
     let sortedPackage = Object.values(package)
       .sort((a, b) => a.position - b.position)
     sortedPackage['receiver'] = receiver
+
+    // console.log(sortedPackage)
+
     blastToUI(sortedPackage)
+    // logs_warn(sortedPackage)
   }
 }
-let deviceInit = []
+
+//VERY FIRST TIME RUN ONLY!!!!
 let init = 1
 setTimeout(() => {
-  init = 0
-  console.log('=== Ready to Receive Inputs ==='.green)
+    init = 0
+    logs('=== Ready to Receive Inputs ==='.green)
 }, 2000)
 main()
+//#############################
 
 ipcMain.on('changePage', async (receivedData) => {
-  main()
-  // deviceInit.forEach(device => device.removeAllListeners())
   setTimeout(() => {
       if (showConsoleMessages) { logs_debug("[RENDERER]".bgGreen,"Page Change:".yellow,windowItemsStore.get('currentPage')) }
-      // ZeroDeviceSetup(deviceSetup,foundDevices,devicesRequested,deviceInit,bufferVals)
+      init = 1
+      initializeUI(getDevicesStore(),"from_brain-detection-initialize")
+
+      setTimeout(() => {
+        init = 0
+        console.log('=== Ready to Receive Inputs ==='.green)
+      }, 2000)
+
   },300)
 })
-ipcMain.on('initializer-response', (event,message) => { 
-    logs_debug("[RENDERER-Init]".bgGreen,message)
-  })
-// if (deviceSetup[jsId] == 0) { initializeUI(buttonArray.bufferDecoded,requestedDevices,"from_brain-detection-initialize"); deviceSetup[jsId] = 1 }
-// const package = {
-//   data: byteArray,
-//   deviceInfo: requestedDevices,
-//   receiver: "from_brain-detection-getbuffer",
-//   keybindArray: 0
-// }
-// blastToUI(package)
+ipcMain.on('initializer-response', (event,message) => {
+    logs("[RENDERER-Init]".bgGreen,message)
+})
+ipcMain.on('renderer-response-error', (event,message,location) => {
+    logs_error("[RENDERER-ERROR]".red,message,location)
+})
+ipcMain.on('renderer-response-unhandled-error', (event,message,location) => {
+    logs_error("[RENDERER-UNHANDLED-ERROR]".bgRed,message,location)
+})

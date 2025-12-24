@@ -15,7 +15,7 @@ function main() {
     const deviceInfo = new Store({ name: "deviceInfo" })
     //! RESETS DEVICES TO DETECT NEW DEVICES
     // deviceInfo.set('devices', {})
-    electronWindowIds.set('currentPage','dashboard')
+    electronWindowIds.set('currentPage','joyview')
     if (!electronWindowIds.get('theme')) {
       electronWindowIds.set('theme','dark')
     }
@@ -148,7 +148,7 @@ function main() {
         win.webContents.on("context-menu", () => {
           rightClickMenu.popup(win.webContents)
         })
-        win.loadFile(path.join(__dirname, './renderers/dashboard/dashboard.html'))
+        win.loadFile(path.join(__dirname, './renderers/joyview/joyview.html'))
 
         win.on("ready-to-show", () => {
           win.setTitle(`Flight Control Viewer - ${app.getVersion()}`)

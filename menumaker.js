@@ -1,5 +1,5 @@
 const {Menu, BrowserWindow, ipcMain} = require('electron')
-const {logs,logs_error, logs_debug} = require('./utils/logConfig')
+const {logs, logs_error, logs_debug} = require('./utils/logConfig')
 const { autoUpdater, cwd } = require('./utils/utilities')
 const Store = require('electron-store').default
 const store = new Store({ name: 'electronWindowIds'})
@@ -15,11 +15,6 @@ const links = {
         store.set('currentPage','joyview')
         ipcMain.emit('changePage','change')
         BrowserWindow.fromId(1).loadURL(`file://${path.join(cwd, 'renderers/joyview/joyview.html')}`)
-    },
-    getbuffer: async function() {
-        store.set('currentPage','getbuffer')
-        ipcMain.emit('changePage','change')
-        BrowserWindow.fromId(1).loadURL(`file://${path.join(cwd, 'renderers/getbuffer/getbuffer.html')}`)
     },
     checkForUpdates: async function() {
         try {

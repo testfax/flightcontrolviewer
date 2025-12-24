@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "device": {
+    "grip": "VPC Constellation ALPHA Prime",
+    "hand": "L",
+    "product": "L-VPC Stick WarBRD-D",
+    "vid": "13124",
+    "pid": "1011"
+  },
+  "overlay": {
+    "image": "left-virpil-constellation-alpha-prime.png",
+    "viewBox": "0 0 1000 1000"
+  },
+
+  "buttons": {
+    "count": 36,
+    "spots": {
+      "button_1":  { "shape": "rect",   "x": 130, "y": 640, "w": 70, "h": 70, "rx": 10 },
+      "button_2":  { "shape": "rect",   "x": 210, "y": 640, "w": 70, "h": 70, "rx": 10 },
+      "button_3":  { "shape": "rect",   "x": 290, "y": 640, "w": 70, "h": 70, "rx": 10 },
+
+      "button_4":  { "shape": "rect",   "x": 150, "y": 560, "w": 60, "h": 45, "rx": 8 },
+      "button_5":  { "shape": "rect",   "x": 220, "y": 560, "w": 60, "h": 45, "rx": 8 },
+
+      "button_6":  { "shape": "circle", "cx": 720, "cy": 480, "r": 18 },
+      "button_7":  { "shape": "rect",   "x": 690, "y": 420, "w": 60, "h": 35, "rx": 6 },
+      "button_8":  { "shape": "rect",   "x": 755, "y": 455, "w": 35, "h": 60, "rx": 6 },
+      "button_9":  { "shape": "rect",   "x": 690, "y": 525, "w": 60, "h": 35, "rx": 6 },
+      "button_10": { "shape": "rect",   "x": 650, "y": 455, "w": 35, "h": 60, "rx": 6 },
+
+      "button_11": { "shape": "circle", "cx": 780, "cy": 190, "r": 20 },
+
+      "button_12": { "shape": "rect",   "x": 560, "y": 140, "w": 30, "h": 50, "rx": 6 },
+      "button_13": { "shape": "rect",   "x": 610, "y": 140, "w": 30, "h": 50, "rx": 6 },
+
+      "button_14": { "shape": "rect",   "x": 420, "y": 520, "w": 60, "h": 60, "rx": 8 },
+      "button_15": { "shape": "rect",   "x": 490, "y": 520, "w": 60, "h": 60, "rx": 8 },
+      "button_16": { "shape": "rect",   "x": 560, "y": 520, "w": 60, "h": 60, "rx": 8 },
+
+      "button_17": { "shape": "rect",   "x": 300, "y": 140, "w": 60, "h": 40, "rx": 6 },
+      "button_18": { "shape": "rect",   "x": 300, "y": 185, "w": 60, "h": 40, "rx": 6 },
+
+      "button_19": { "shape": "rect",   "x": 360, "y": 240, "w": 50, "h": 40, "rx": 6 },
+      "button_20": { "shape": "rect",   "x": 415, "y": 285, "w": 40, "h": 50, "rx": 6 },
+      "button_21": { "shape": "rect",   "x": 360, "y": 340, "w": 50, "h": 40, "rx": 6 },
+      "button_22": { "shape": "rect",   "x": 310, "y": 285, "w": 40, "h": 50, "rx": 6 },
+
+      "button_23": { "shape": "rect",   "x": 650, "y": 740, "w": 110, "h": 60, "rx": 8 },
+
+      "button_24": { "shape": "rect",   "x": 120, "y": 740, "w": 60, "h": 60, "rx": 8 },
+      "button_25": { "shape": "rect",   "x": 190, "y": 740, "w": 60, "h": 60, "rx": 8 },
+      "button_26": { "shape": "rect",   "x": 260, "y": 740, "w": 60, "h": 60, "rx": 8 },
+
+      "button_27": { "shape": "rect",   "x": 840, "y": 420, "w": 40, "h": 40, "rx": 6 },
+      "button_28": { "shape": "rect",   "x": 890, "y": 420, "w": 40, "h": 40, "rx": 6 },
+
+      "button_29": { "shape": "rect",   "x": 840, "y": 470, "w": 40, "h": 40, "rx": 6 },
+      "button_30": { "shape": "rect",   "x": 890, "y": 470, "w": 40, "h": 40, "rx": 6 },
+
+      "button_31": { "shape": "rect",   "x": 840, "y": 520, "w": 40, "h": 40, "rx": 6 },
+      "button_32": { "shape": "rect",   "x": 890, "y": 520, "w": 40, "h": 40, "rx": 6 },
+
+      "button_33": { "shape": "rect",   "x": 840, "y": 570, "w": 40, "h": 40, "rx": 6 },
+      "button_34": { "shape": "rect",   "x": 890, "y": 570, "w": 40, "h": 40, "rx": 6 },
+
+      "button_35": { "shape": "rect",   "x": 840, "y": 620, "w": 40, "h": 40, "rx": 6 },
+      "button_36": { "shape": "rect",   "x": 890, "y": 620, "w": 40, "h": 40, "rx": 6 }
+    }
+  },
+
+  "axes": {
+    "names": ["rx", "ry", "slider", "x", "y", "z"],
+    "spots": {
+      "axis_rx":     { "shape": "rect", "x": 120, "y": 860, "w": 220, "h": 55, "rx": 8 },
+      "axis_ry":     { "shape": "rect", "x": 120, "y": 925, "w": 220, "h": 55, "rx": 8 },
+      "axis_slider": { "shape": "rect", "x": 360, "y": 925, "w": 220, "h": 55, "rx": 8 },
+      "axis_x":      { "shape": "rect", "x": 600, "y": 860, "w": 220, "h": 55, "rx": 8 },
+      "axis_y":      { "shape": "rect", "x": 600, "y": 925, "w": 220, "h": 55, "rx": 8 },
+      "axis_z":      { "shape": "rect", "x": 600, "y": 795, "w": 220, "h": 55, "rx": 8 }
+    }
+  }
+}

@@ -27,7 +27,6 @@ async function clickedEvent(evt) {
   //    In this parent function, we are only selecting one item to look for, which we will put in an array anyways for the 
   //        arraySearch() function to properly work.
     const clickedEvent = [evt.target.getAttribute('id')] //id="guardian_moduleblueprint_checkbox"
-    
     let clickedEventMod = clickedEvent[0]
     let clickedNameEvent = null;
     try {
@@ -38,9 +37,10 @@ async function clickedEvent(evt) {
     }
     catch (e) {
     }
+    const final = clickedEventMod.length == 0 ? clickedNameEvent : clickedEventMod
     const nonUiEvents = ['expandall','collapseall','checkbox']
     const events = arraySearch(nonUiEvents,clickedNameEvent)
-    
+
     if (events.found.length) {
       // if (evt.target.hasAttribute('expandall')) {
       //   const allExpansion = document.getElementsByClassName('expansion')
@@ -118,9 +118,17 @@ ipcRenderer.on('from_brain-detection', (package) => {
   try {
     const changeButton = document.getElementById(`${package.joyInput}_assignment`)
     const changeButton2 = document.getElementById(`${package.prefix}displayedBind_assignment`)
-    const title = document.getElementById(`${package.prefix}displayedBind_position`)
+
+    const title = document.getElementById(`${package.prefix}displayedBind`)
+    for (const n of [...title.childNodes]) {
+      if (n.nodeType === Node.TEXT_NODE) {
+        title.removeChild(n)
+      }
+    }
+    const textNode = document.createTextNode(`${package.product}` + ` «» ` + package.joyInput.toUpperCase())
+
     let bindStack = []
-    if (package.keybindArray != 0) { //!0 just means that hte keybind wasn't set yet
+    if (package.keybindArray != 0) { //!0 just means that hte keybind wasn't set in game yet
       package.keybindArray.forEach(item => {
         item.actions.forEach(act => {
           bindStack.push({ [item.categoryName] : { "action": act } })
@@ -151,12 +159,12 @@ ipcRenderer.on('from_brain-detection', (package) => {
       // console.log(screenReady)
       changeButton.innerText = screenReady
       changeButton2.innerText = screenReady
-      title.innerText = package.product + ` «» ` + package.joyInput.toUpperCase()
+      title.insertBefore(textNode, title.children[0].nextSibling)
     }
     else {
       changeButton.innerText = package.joyInput
       changeButton2.innerText = package.joyInput
-      title.innerText = package.product + ` «» ` + package.joyInput.toUpperCase()
+      title.insertBefore(textNode, title.children[0].nextSibling)
     }
     let allColors = document.getElementsByClassName(`currentButton_${package.prefix}`)
     if (allColors.length > 0) {
@@ -179,10 +187,11 @@ ipcRenderer.on('from_brain-detection', (package) => {
 ipcRenderer.on('from_brain-detection-initialize', (package) => {
   for (const device in package) { 
     // console.log(package[device])
-    document.getElementById(`${package[device].prefix}position`).innerText = package[device].product
-    document.getElementById(`${package[device].prefix}displayedBind_position`).innerText = package[device].product
+    document.getElementById(`${package[device].prefix}_position`).innerText = package[device].product
+    const header = document.getElementById(`${package[device].prefix}displayedBind`)
+      header.insertAdjacentText('beforeend',`${package[device].product}`)
     const container = document.getElementById(`${package[device].prefix}bar_container`)
-    let dynamicDom = document.getElementsByClassName(`${package[device].prefix}DynamicDom`)
+    let dynamicDom = document.getElementsByClassName(`${package[device].prefix}_DynamicDom`)
     dynamicDom = Array.from(dynamicDom)
     dynamicDom.forEach(dom => { dom.remove() })
     try {
@@ -192,24 +201,24 @@ ipcRenderer.on('from_brain-detection-initialize', (package) => {
 
           const newTR = document.createElement('tr')
           container.appendChild(newTR)
-          newTR.setAttribute('class',`${package[device].prefix}DynamicDom ${package[device].prefix}DynamicDomTR`)
+          newTR.setAttribute('class',`${package[device].prefix}_DynamicDom ${package[device].prefix}_DynamicDomTR`)
 
           const TH1 = document.createElement('th')
           newTR.appendChild(TH1)
-          TH1.setAttribute('class',`${package[device].prefix}DynamicDom font-BLOCKY w3-text-orange`)
-          TH1.setAttribute('id',`${package[device].prefix}button${btn}_assignment`)
+          TH1.setAttribute('class',`${package[device].prefix}_DynamicDom font-BLOCKY w3-text-orange`)
+          TH1.setAttribute('id',`${package[device].prefix}_button${btn}_assignment`)
           TH1.innerText = ""
 
           const TH2 = document.createElement('th')
           newTR.appendChild(TH2)
-          TH2.setAttribute('class',`${package[device].prefix}DynamicDom font-BLOCKY w3-text-orange`)
-          TH2.setAttribute('id',`${package[device].prefix}button${btn}_slot`)
+          TH2.setAttribute('class',`${package[device].prefix}_DynamicDom font-BLOCKY w3-text-orange`)
+          TH2.setAttribute('id',`${package[device].prefix}_button${btn}_slot`)
           TH2.innerText = btn
     
           const TH3 = document.createElement('th')
           newTR.appendChild(TH3)
-          TH3.setAttribute('class',`${package[device].prefix}DynamicDom font-BLOCKY w3-text-orange`)
-          TH3.setAttribute('id',`${package[device].prefix}button${btn}_index`)
+          TH3.setAttribute('class',`${package[device].prefix}_DynamicDom font-BLOCKY w3-text-orange`)
+          TH3.setAttribute('id',`${package[device].prefix}_button${btn}_index`)
           TH3.innerText = btn
         }
       }
@@ -217,25 +226,25 @@ ipcRenderer.on('from_brain-detection-initialize', (package) => {
         for (let axis of package[device].axes) {
           const newTR = document.createElement('tr')
           container.appendChild(newTR)
-          newTR.setAttribute('class',`${package[device].prefix}DynamicDom ${package[device].prefix}DynamicDomTR`)
+          newTR.setAttribute('class',`${package[device].prefix}_DynamicDom ${package[device].prefix}_DynamicDomTR`)
 
           const TH1 = document.createElement('th')
           newTR.appendChild(TH1)
-          TH1.setAttribute('class',`${package[device].prefix}DynamicDom font-BLOCKY w3-text-orange`)
-          TH1.setAttribute('id',`${package[device].prefix + "axis_" + axis}_assignment`)
+          TH1.setAttribute('class',`${package[device].prefix}_DynamicDom font-BLOCKY w3-text-orange`)
+          TH1.setAttribute('id',`${package[device].prefix + "_axis_" + axis}_assignment`)
           TH1.innerText = ""
 
           const TH2 = document.createElement('th')
           newTR.appendChild(TH2)
-          TH2.setAttribute('class',`${package[device].prefix}DynamicDom font-BLOCKY w3-text-orange`)
-          TH2.setAttribute('id',`${package[device].prefix + "axis_" + axis}_slot`)
-          TH2.innerText = package[device].prefix + "axis_" + axis
+          TH2.setAttribute('class',`${package[device].prefix}_DynamicDom font-BLOCKY w3-text-orange`)
+          TH2.setAttribute('id',`${package[device].prefix + "_axis_" + axis}_slot`)
+          TH2.innerText = package[device].prefix + "_axis_" + axis
     
           const TH3 = document.createElement('th')
           newTR.appendChild(TH3)
-          TH3.setAttribute('class',`${package[device].prefix}DynamicDom font-BLOCKY w3-text-orange`)
-          TH3.setAttribute('id',`${package[device].prefix + "axis_" + axis}_index`)
-          TH3.innerText = package[device].prefix + "axis_" + axis
+          TH3.setAttribute('class',`${package[device].prefix}_DynamicDom font-BLOCKY w3-text-orange`)
+          TH3.setAttribute('id',`${package[device].prefix + "_axis_" + axis}_index`)
+          TH3.innerText = package[device].prefix + "_axis_" + axis
         }
       }
     }
