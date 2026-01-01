@@ -9,18 +9,22 @@
   width: 100%;
   height: auto;
   display: block;
+  background: rgb(18, 18, 18);
 }
 
 /* clickable spots */
 .joy_spot {
-  fill: rgba(255,255,255,0.08);
+  fill: rgba(0, 0, 0, 0.08);
   stroke: rgba(255,255,255,0.35);
   stroke-width: 2;
   cursor: pointer;
   transition: 120ms;
 }
 .joy_spot.hover { fill: rgba(255,255,255,0.14); }
-.joy_spot.active { fill: rgba(0,255,0,0.18); stroke: rgba(0,255,0,0.75); }
+.joy_spot.active { 
+  fill: rgba(0, 0, 0, 1); 
+  stroke: rgba(0,255,0,0.75); 
+}
 
 /* group overlay boxes (one per group) */
 .joy_group_overlays {
@@ -42,3 +46,12 @@
   flex-direction: column;
   gap: 10px;
 }
+
+.bind_log {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bind_entry { white-space: pre-line; }
+.bind_active { color: #00ff66; } /* green */

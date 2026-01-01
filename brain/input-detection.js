@@ -474,19 +474,22 @@ function startInputLoggerForDevice(d, parsed) {
     device = new HID.HID(d.path)
   } catch (e) {
     logs_error(prefix + 'open_failed', d.path)
-    // console.error(prefix + 'open_failed', d.path)
     return
   }
 
   const warmed = new Set()
   const lastButtons = new Map()
 
-  // axis state
+  // axis state (KEYED BY OUTPUT STRING NOW)
   const axisActive = new Map()
   const axisLastVal = new Map()
   const axisLastEmit = new Map()
 
-  // NEW: suppress repeats if the exact same control was the last one reported
+  // rotx/roty gating
+  const rotArmed = new Map() // outKey -> boolean
+  const rotHome = new Map()  // outKey -> learned center value at rest (from warmup)
+
+  // suppress repeats if the exact same control was the last one reported
   let lastReported = ''
 
   function reportOnce(keyStr) {
@@ -495,10 +498,13 @@ function startInputLoggerForDevice(d, parsed) {
     return true
   }
 
-  // tune these without changing behavior elsewhere
+  // block axis reporting for 1s after any button press
+  let lastButtonAt = 0
+  const AXIS_BLOCK_AFTER_BUTTON_MS = 1000
+
   const CENTER_PERCENT = 0.10
   const MOVE_PERCENT = 0.02
-  const AXIS_COOLDOWN_MS = 250
+  const AXIS_COOLDOWN_MS = 1000
 
   device.on('data', (data) => {
     let rid = 0
@@ -514,21 +520,31 @@ function startInputLoggerForDevice(d, parsed) {
     if (!buttons.length && !axes.length) return
 
     if (!warmed.has(rid)) {
-      for (const b of buttons) lastButtons.set(`${rid}:${b.usage}`, readButtonBit(payload, b.bitOffset))
+      for (const b of buttons) {
+        lastButtons.set(`${rid}:${b.usage}`, readButtonBit(payload, b.bitOffset))
+      }
 
       for (const a of axes) {
-        const key = `${rid}:${a.name}`
+        const outKey = `${prefix}axis_${a.name}`
+
         const rawU = readBitsAsUnsignedLE(payload, a.bitOffset, a.bitSize)
         let val = rawU
         if (a.logicalMin < 0) val = toSigned(rawU, a.bitSize)
-        axisLastVal.set(key, val)
-        axisActive.set(key, false)
-        axisLastEmit.set(key, 0)
+
+        axisLastVal.set(outKey, val)
+        axisActive.set(outKey, false)
+        axisLastEmit.set(outKey, 0)
+
+        // learn rotx/roty "home" (resting center) from warmup value
+        if (a.name === 'rotx' || a.name === 'roty') {
+          rotHome.set(outKey, val)
+          rotArmed.set(outKey, true)
+        }
       }
 
       if (axes.length) {
         const names = axes.map(x => x.name).join(',')
-        if (showConsoleMessages) { console.log(prefix + `axes_rid${rid}=` + names, 'loaded'.green) }
+        if (showConsoleMessages) console.log(prefix + `axes_rid${rid}=` + names, 'loaded'.green)
         logs('[BRAIN]'.bgCyan, 'input-detection'.yellow, prefix + `axes_rid${rid}=` + names, 'loaded'.green)
       }
 
@@ -536,26 +552,30 @@ function startInputLoggerForDevice(d, parsed) {
       return
     }
 
-    // Buttons: press-only, suppress repeat of same button as last reported
+    // Buttons
     for (const b of buttons) {
       const key = `${rid}:${b.usage}`
       const prev = lastButtons.get(key) || false
       const down = readButtonBit(payload, b.bitOffset)
 
       if (down && !prev) {
+        lastButtonAt = Date.now()
+
         const out = `${prefix}button${b.usage}`
         if (reportOnce(out)) {
-          if (showConsoleMessages) { console.log(out.blue) }
-          gatherAfterDeviceInputs(out,d)
+          console.log(out.blue)
+          if (showConsoleMessages) console.log(out.blue)
+          gatherAfterDeviceInputs(out, d)
         }
       }
 
       lastButtons.set(key, down)
     }
 
-    // Axes: log on meaningful movement (no rest), suppress repeat of same axis as last reported
+    // Axes
     for (const a of axes) {
-      const key = `${rid}:${a.name}`
+      const out = `${prefix}axis_${a.name}`
+
       const rawU = readBitsAsUnsignedLE(payload, a.bitOffset, a.bitSize)
       let val = rawU
       if (a.logicalMin < 0) val = toSigned(rawU, a.bitSize)
@@ -563,13 +583,13 @@ function startInputLoggerForDevice(d, parsed) {
       const cfg = computeAxisCenterAndThreshold(a, CENTER_PERCENT)
       const centerDelta = Math.abs(val - cfg.center)
 
-      const prevVal = axisLastVal.get(key)
-      axisLastVal.set(key, val)
+      const prevVal = axisLastVal.get(out)
+      axisLastVal.set(out, val)
 
       const now = Date.now()
-      const lastEmit = axisLastEmit.get(key) || 0
+      const lastEmit = axisLastEmit.get(out) || 0
 
-      const wasActive = axisActive.get(key) || false
+      const wasActive = axisActive.get(out) || false
       const isActive = centerDelta >= cfg.threshold
 
       let movedEnough = false
@@ -578,30 +598,71 @@ function startInputLoggerForDevice(d, parsed) {
         if (Math.abs(val - prevVal) >= moveThreshold) movedEnough = true
       }
 
-      if (init == 0) {
+      const buttonCooldownActive = (now - lastButtonAt) < AXIS_BLOCK_AFTER_BUTTON_MS
+
+      // ---- rotx/roty must hit >50% throw, then return within 10% to re-arm ----
+      const isRot = (a.name === 'rotx' || a.name === 'roty')
+      if (isRot) {
+        const home = rotHome.get(out)
+        if (typeof home === 'number') {
+          const rotDelta = Math.abs(val - home)
+
+          const halfThrow = Math.max(1, Math.round(cfg.range * 0.50))
+          const withinTen = Math.max(1, Math.round(cfg.range * 0.10))
+
+          let armed = rotArmed.get(out)
+          if (armed == null) armed = true
+
+          // locked: only re-arm when back within 10% of home
+          if (!armed) {
+            if (rotDelta <= withinTen) rotArmed.set(out, true)
+            axisActive.set(out, isActive)
+            continue
+          }
+
+          // armed: only allow any reporting once past 50% from home
+          if (rotDelta < halfThrow) {
+            axisActive.set(out, isActive)
+            continue
+          }
+        }
+      }
+      // -----------------------------------------------------------------------
+
+      if (init == 0 && !buttonCooldownActive) {
         if (!wasActive && isActive) {
-          const out = `${prefix}axis_${a.name}`
           if (reportOnce(out)) {
-            if (showConsoleMessages) { console.log(out.cyan) }
+            console.log(out.cyan)
+            if (showConsoleMessages) console.log(out.cyan)
           }
-          axisLastEmit.set(key, now)
+          axisLastEmit.set(out, now)
         } else if (movedEnough && (now - lastEmit) >= AXIS_COOLDOWN_MS) {
-          const out = `${prefix}axis_${a.name}`
           if (reportOnce(out)) {
-            if (showConsoleMessages) { console.log(out.red) }
-            gatherAfterDeviceInputs(out,d)
+            console.log(out.red)
+            if (showConsoleMessages) console.log(out.red)
+            gatherAfterDeviceInputs(out, d)
           }
-          axisLastEmit.set(key, now)
+
+          // lock rotx/roty ONLY when we actually trigger (red path)
+          if (a.name === 'rotx' || a.name === 'roty') {
+            rotArmed.set(out, false)
+          }
+
+          axisLastEmit.set(out, now)
         }
       }
 
-      axisActive.set(key, isActive)
+      axisActive.set(out, isActive)
     }
   })
 
   device.on('error', (err) => {
-    // console.error(prefix + 'hid_error', err && err.stack ? err.stack : err)
     logs_error(err)
+    setTimeout(() => {
+      console.log("[BRAIN]".bgCyan, "RESTARTING AFTER DEVICE LOST".red)
+        app.relaunch()
+        app.exit(0)
+    }, 8000)
   })
 }
 function findKeybind(key, discoveredKeybinds) {
@@ -879,8 +940,6 @@ ipcMain.handle('joyview:get-layout', async (event, { vidPidKey }) => {
     return { ok: 0, error: err?.message || String(err) }
   }
 })
-
-
 ipcMain.on('changePage', async (receivedData) => {
   setTimeout(() => {
       if (showConsoleMessages) { logs_debug("[RENDERER]".bgGreen,"Page Change:".yellow,windowItemsStore.get('currentPage')) }
