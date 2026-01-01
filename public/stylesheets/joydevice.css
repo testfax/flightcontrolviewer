@@ -1,0 +1,44 @@
+/* host that will contain 2 stacked view canvases (side/back) */
+.joy_device_canvas {
+  width: 420px;
+  max-width: 100%;
+}
+
+/* each SVG scales to container */
+.joy_svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* clickable spots */
+.joy_spot {
+  fill: rgba(255,255,255,0.08);
+  stroke: rgba(255,255,255,0.35);
+  stroke-width: 2;
+  cursor: pointer;
+  transition: 120ms;
+}
+.joy_spot.hover { fill: rgba(255,255,255,0.14); }
+.joy_spot.active { fill: rgba(0,255,0,0.18); stroke: rgba(0,255,0,0.75); }
+
+/* group overlay boxes (one per group) */
+.joy_group_overlays {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.joy_group_box {
+  border: 1px solid rgba(255,255,255,0.25);
+  padding: 8px 10px;
+  border-radius: 8px;
+  white-space: pre-line;
+}
+.joy_group_box.hover { border-color: rgba(255,255,255,0.55); }
+.joy_group_box.active { border-color: rgba(0,255,0,0.85); }
+.joy_views {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}

@@ -1,24 +1,38 @@
 {
-  "schema": 1,
+  "schema": 2,
+
   "device": {
     "product": "VPC ACE-Torq Rudder",
-    "vid": "13124",
-    "pid": "505"
-  },
-  "overlay": {
-    "image": "vpc-ace-torq-rudder.png",
-    "viewBox": "0 0 1000 1000"
+    "vid": "3344",
+    "pid": "01F9"
   },
 
-  "buttons": {
-    "count": 0,
-    "spots": {}
+  "overlays": {
+    "main": {
+      "image": "vpc-ace-torq-rudder.png",
+      "sheet": { "w": 1000, "h": 1000 },
+      "viewBox": "0 0 1000 1000"
+    }
+  },
+
+  "groups": {
+    "rudder": {
+      "label": "Rudder (Z)",
+      "inputs": ["axis_z"]
+    }
   },
 
   "axes": {
     "names": ["z"],
     "spots": {
-      "axis_z": { "shape": "rect", "x": 150, "y": 860, "w": 700, "h": 70, "rx": 10 }
+      "axis_z": {
+        "shape": "rect",
+        "x": 200,
+        "y": 420,
+        "w": 600,
+        "h": 90,
+        "rx": 18
+      }
     }
   }
 }

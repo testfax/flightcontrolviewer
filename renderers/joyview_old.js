@@ -1,10 +1,12 @@
 try {
   const location = 'joyview'
+
+  // normalize ipcRenderer handle (you were mixing ipc / ipcRenderer)
   const ipcRenderer = window.ipcRenderer
+
   const windowLoaded = new Promise(resolve => {
     window.onload = resolve
   })
-
 
   windowLoaded.then(() => {
     // FUNCTIONS FROM MOUSEOVER
@@ -31,6 +33,11 @@ try {
   window.addEventListener('click', clickedEvent)
 
   async function clickedEvent(evt) {
+    // Use arraySearch(f) to parse through something your looking for in an array or if you are comparing multiple arrays.
+    // Combines forEach and find loop methods.
+    // In this parent function, we are only selecting one item to look for, which we will put in an array anyways for the
+    // arraySearch() function to properly work.
+
     const clickedEventArr = [evt.target.getAttribute('id')] // id="guardian_moduleblueprint_checkbox"
     let clickedEventMod = clickedEventArr[0]
     let clickedNameEvent = null
@@ -161,14 +168,7 @@ try {
   }
 
   const layoutState = {
-    // prefix -> {
-    //   layout,
-    //   spotEls: Map(joyInput -> SVGElement),
-    //   groupBoxEls: Map(groupId -> HTMLElement),
-    //   inputToGroup: Map(joyInput -> groupId),
-    //   activeGroupId: string|null,
-    //   activeSpotJoyInputId: string|null
-    // }
+    // prefix -> { layout, spotEls: Map(joyInput -> SVGElement), groupBoxEls: Map(groupId -> HTMLElement), inputToGroup: Map(joyInput -> groupId) }
     byPrefix: new Map()
   }
 
@@ -294,8 +294,6 @@ try {
 
     // device image
     const img = document.createElementNS('http://www.w3.org/2000/svg', 'image')
-    // TEST: log the real PNG dimensions
-    img.addEventListener('load', () => console.log(prefix, 'PNG natural size:', img.width.baseVal.value, img.height.baseVal.value))
     img.setAttribute('href', imageUrl)
     img.setAttribute('x', '0')
     img.setAttribute('y', '0')
@@ -333,14 +331,7 @@ try {
     canvasHost.appendChild(svg)
 
     // store for highlight updates
-    layoutState.byPrefix.set(prefix, {
-      layout: layoutJson,
-      spotEls,
-      groupBoxEls,
-      inputToGroup,
-      activeGroupId: null,
-      activeSpotJoyInputId: null
-    })
+    layoutState.byPrefix.set(prefix, { layout: layoutJson, spotEls, groupBoxEls, inputToGroup })
   }
 
   ipcRenderer.on('from_brain-detection', async package => {
@@ -351,62 +342,49 @@ try {
       if (st) {
         const joyInputId = package.joyInput
         const spotEl = st.spotEls.get(joyInputId)
-
         if (spotEl) {
-          const gid = st.inputToGroup.get(joyInputId) || null
+          // force re-flash every event
+          spotEl.classList.remove('active')
+          spotEl.getBoundingClientRect()
+          spotEl.classList.add('active')
+
+          clearTimeout(spotEl._offTimer)
+          spotEl._offTimer = setTimeout(() => {
+            spotEl.classList.remove('active')
+          }, 120)
+
+          const gid = st.inputToGroup.get(joyInputId)
           const boxEl = gid ? st.groupBoxEls.get(gid) : null
 
-          // LATCHED GROUP/SPOT HIGHLIGHT:
-          // - if group changed, remove highlight from old group + old spot
-          // - if same group, keep group highlighted; only move spot highlight
-          if (st.activeGroupId !== gid) {
-            if (st.activeGroupId) {
-              const oldBox = st.groupBoxEls.get(st.activeGroupId)
-              if (oldBox) oldBox.classList.remove('active')
-            }
-            if (st.activeSpotJoyInputId) {
-              const oldSpot = st.spotEls.get(st.activeSpotJoyInputId)
-              if (oldSpot) oldSpot.classList.remove('active')
-            }
-            st.activeGroupId = gid
-            st.activeSpotJoyInputId = null
-          } else {
-            // same group: clear only previous spot
-            if (st.activeSpotJoyInputId && st.activeSpotJoyInputId !== joyInputId) {
-              const oldSpot = st.spotEls.get(st.activeSpotJoyInputId)
-              if (oldSpot) oldSpot.classList.remove('active')
-            }
-          }
+          if (boxEl) {
+            boxEl.classList.remove('active')
+            boxEl.getBoundingClientRect()
+            boxEl.classList.add('active')
 
-          // ensure current group + spot are highlighted
-          if (boxEl) boxEl.classList.add('active')
-          spotEl.classList.add('active')
-          st.activeSpotJoyInputId = joyInputId
+            clearTimeout(boxEl._offTimer)
+            boxEl._offTimer = setTimeout(() => {
+              boxEl.classList.remove('active')
+            }, 220)
+          }
 
           // done (don’t also try old DOM highlight)
           return
         }
       }
 
-      // Fallback: old DOM highlight (latched per-prefix is not possible here without group mapping)
+      // Fallback: old DOM highlight
       const node = document.getElementById(package.joyInput)
       if (!node) {
         recordUnplaced(package)
       } else {
-        // Optional latch-like behavior for old DOM: clear previous and set current
-        // (this is per prefix if we can infer prefix)
-        // This keeps something highlighted until a different input arrives (any input).
-        if (package.prefix) {
-          const prevKey = `__joyview_prev_dom_${package.prefix}`
-          const prevId = window[prevKey]
-          if (prevId && prevId !== package.joyInput) {
-            const prevNode = document.getElementById(prevId)
-            if (prevNode) prevNode.classList.remove('active')
-          }
-          window[prevKey] = package.joyInput
-        }
-
+        node.classList.remove('active')
+        node.getBoundingClientRect()
         node.classList.add('active')
+
+        clearTimeout(node._offTimer)
+        node._offTimer = setTimeout(() => {
+          node.classList.remove('active')
+        }, 120)
       }
     } catch (err) {
       console.log(err)
@@ -496,7 +474,7 @@ try {
         const prefix = d.prefix
         const product = d.product || ''
 
-        // // headers
+        // headers
         const posEl = document.getElementById(`${prefix}_position`)
         if (posEl) posEl.innerText = product
 
@@ -512,67 +490,67 @@ try {
           ipcRenderer.send('renderer-response-error', serializeError(err), location)
         }
 
-        // // rebuild table rows
-        // const container = document.getElementById(`${prefix}bar_container`)
-        // if (!container) continue
+        // rebuild table rows
+        const container = document.getElementById(`${prefix}bar_container`)
+        if (!container) continue
 
-        // let dynamicDom = document.getElementsByClassName(`${prefix}_DynamicDom`)
-        // dynamicDom = Array.from(dynamicDom)
-        // dynamicDom.forEach(dom => dom.remove())
+        let dynamicDom = document.getElementsByClassName(`${prefix}_DynamicDom`)
+        dynamicDom = Array.from(dynamicDom)
+        dynamicDom.forEach(dom => dom.remove())
 
-        // if (d.buttons != 0) {
-        //   for (let btn = 1; btn <= d.buttons; btn++) {
-        //     const newTR = document.createElement('tr')
-        //     container.appendChild(newTR)
+        if (d.buttons != 0) {
+          for (let btn = 1; btn <= d.buttons; btn++) {
+            const newTR = document.createElement('tr')
+            container.appendChild(newTR)
 
-        //     newTR.setAttribute('class', `${prefix}_DynamicDom ${prefix}_DynamicDomTR`)
+            newTR.setAttribute('class', `${prefix}_DynamicDom ${prefix}_DynamicDomTR`)
 
-        //     const TH1 = document.createElement('th')
-        //     newTR.appendChild(TH1)
-        //     TH1.setAttribute('class', `${prefix}_DynamicDom font-BLOCKY w3-text-orange`)
-        //     TH1.setAttribute('id', `${prefix}_button${btn}_assignment`)
-        //     TH1.innerText = ''
+            const TH1 = document.createElement('th')
+            newTR.appendChild(TH1)
+            TH1.setAttribute('class', `${prefix}_DynamicDom font-BLOCKY w3-text-orange`)
+            TH1.setAttribute('id', `${prefix}_button${btn}_assignment`)
+            TH1.innerText = ''
 
-        //     const TH2 = document.createElement('th')
-        //     newTR.appendChild(TH2)
-        //     TH2.setAttribute('class', `${prefix}_DynamicDom font-BLOCKY w3-text-orange`)
-        //     TH2.setAttribute('id', `${prefix}_button${btn}_slot`)
-        //     TH2.innerText = String(btn)
+            const TH2 = document.createElement('th')
+            newTR.appendChild(TH2)
+            TH2.setAttribute('class', `${prefix}_DynamicDom font-BLOCKY w3-text-orange`)
+            TH2.setAttribute('id', `${prefix}_button${btn}_slot`)
+            TH2.innerText = String(btn)
 
-        //     const TH3 = document.createElement('th')
-        //     newTR.appendChild(TH3)
-        //     TH3.setAttribute('class', `${prefix}_DynamicDom font-BLOCKY w3-text-orange`)
-        //     TH3.setAttribute('id', `${prefix}_button${btn}_index`)
-        //     TH3.innerText = String(btn)
-        //   }
-        // }
+            const TH3 = document.createElement('th')
+            newTR.appendChild(TH3)
+            TH3.setAttribute('class', `${prefix}_DynamicDom font-BLOCKY w3-text-orange`)
+            TH3.setAttribute('id', `${prefix}_button${btn}_index`)
+            TH3.innerText = String(btn)
+          }
+        }
 
-        // if (d.axes != 0) {
-        //   for (const axis of d.axes) {
-        //     const newTR = document.createElement('tr')
-        //     container.appendChild(newTR)
+        if (d.axes != 0) {
+          for (const axis of d.axes) {
+            const newTR = document.createElement('tr')
+            container.appendChild(newTR)
 
-        //     newTR.setAttribute('class', `${prefix}_DynamicDom ${prefix}_DynamicDomTR`)
+            newTR.setAttribute('class', `${prefix}_DynamicDom ${prefix}_DynamicDomTR`)
 
-        //     const TH1 = document.createElement('th')
-        //     newTR.appendChild(TH1)
-        //     TH1.setAttribute('class', `${prefix}_DynamicDom font-BLOCKY w3-text-orange`)
-        //     TH1.setAttribute('id', `${prefix}_axis_${axis}_assignment`)
-        //     TH1.innerText = ''
+            const TH1 = document.createElement('th')
+            newTR.appendChild(TH1)
+            TH1.setAttribute('class', `${prefix}_DynamicDom font-BLOCKY w3-text-orange`)
+            TH1.setAttribute('id', `${prefix}_axis_${axis}_assignment`)
+            TH1.innerText = ''
 
-        //     const TH2 = document.createElement('th')
-        //     newTR.appendChild(TH2)
-        //     TH2.setAttribute('class', `${prefix}_DynamicDom font-BLOCKY w3-text-orange`)
-        //     TH2.setAttribute('id', `${prefix}_axis_${axis}_slot`)
-        //     TH2.innerText = `${prefix}_axis_${axis}`
+            const TH2 = document.createElement('th')
+            newTR.appendChild(TH2)
+            TH2.setAttribute('class', `${prefix}_DynamicDom font-BLOCKY w3-text-orange`)
+            TH2.setAttribute('id', `${prefix}_axis_${axis}_slot`)
+            TH2.innerText = `${prefix}_axis_${axis}`
 
-        //     const TH3 = document.createElement('th')
-        //     newTR.appendChild(TH3)
-        //     TH3.setAttribute('class', `${prefix}_DynamicDom font-BLOCKY w3-text-orange`)
-        //     TH3.setAttribute('id', `${prefix}_axis_${axis}_index`)
-        //     TH3.innerText = `${prefix}_axis_${axis}`
-        //   }
-        // }
+            const TH3 = document.createElement('th')
+            newTR.appendChild(TH3)
+            TH3.setAttribute('class', `${prefix}_DynamicDom font-BLOCKY w3-text-orange`)
+            TH3.setAttribute('id', `${prefix}_axis_${axis}_index`)
+            TH3.innerText = `${prefix}_axis_${axis}`
+          }
+        }
 
         ipcRenderer.send('initializer-response', `${prefix} joyview initialized...`)
       }
@@ -582,5 +560,5 @@ try {
   })
 } catch (err) {
   console.log('MAIN', err)
-  if (window.ipcRenderer) window.ipcRenderer.send('renderer-response-unhandled-error', serializeError(err), location)
+  if (window.ipcRenderer) window.ipcRenderer.send('renderer-response-unhandled-error', serializeError(err), 'joyview')
 }

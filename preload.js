@@ -19,6 +19,9 @@ try {
     removeListener: (channel, func) => {
       ipcRenderer.removeListener(channel, func);
     },
+    invoke: (channel, ...args) => {
+      return ipcRenderer.invoke(channel, ...args)
+    }
   })
   contextBridge.exposeInMainWorld('electronStoreMaterials', {
     set: (storeName, key, value) => {

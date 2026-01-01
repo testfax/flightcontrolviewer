@@ -82,21 +82,6 @@ const template = [
         // ]
     },
     {
-        label: 'Get Buffer',
-        // click: ()=>{links.statistics();} 
-        click: ()=>{links.getbuffer()}
-        // submenu: [
-        //     {
-        //         label: 'Sampling',
-        //         click: ()=>{links.sampling()}
-        //     },
-        //     // {
-        //     //     label: 'Test',
-        //     //     click: ()=>{links.test()}
-        //     // }
-        // ]
-    },
-    {
         label: 'About',
         submenu: [
             {

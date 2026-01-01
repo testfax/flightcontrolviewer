@@ -8,6 +8,9 @@ const windowItemsStore = new Store({ name: 'electronWindowIds' })
 const actionmaps = new Store({ name: 'actionmapsJSON' })
 const showConsoleMessages = windowItemsStore.get('showConsoleMessages')
 const staticData = require('../staticData.json')
+const fs = require('fs')
+const path = require('path')
+const { pathToFileURL } = require('url')
 
 function toHex4(n) {
   return Number(n).toString(16).toUpperCase().padStart(4, '0')
@@ -795,8 +798,11 @@ function initializeUI(data, receiver) {
     // console.log(sortedPackage)
 
     blastToUI(sortedPackage)
-    // logs_warn(sortedPackage)
+    logs_warn(sortedPackage)
   }
+}
+function resolveLayoutsDir(app, path) {
+  return path.join(app.getAppPath(), 'layouts')
 }
 
 //VERY FIRST TIME RUN ONLY!!!!
@@ -807,6 +813,73 @@ setTimeout(() => {
 }, 2000)
 main()
 //#############################
+
+ipcMain.handle('joyview:get-layout', async (event, { vidPidKey }) => {
+  try {
+    if (!vidPidKey || typeof vidPidKey !== 'string') {
+      return { ok: 0, error: 'Invalid vidPidKey' }
+    }
+
+    const dir = resolveLayoutsDir(app, path)
+
+    const indexPath = path.join(dir, 'index.json')
+    if (!fs.existsSync(indexPath)) {
+      return { ok: 0, error: `Missing layouts/index.json at ${indexPath}` }
+    }
+
+    const indexJson = JSON.parse(fs.readFileSync(indexPath, 'utf8'))
+    const devicesMap = indexJson?.devices
+
+    if (!devicesMap || typeof devicesMap !== 'object') {
+      return { ok: 0, error: 'layouts/index.json missing "devices" map' }
+    }
+
+    const layoutFile = devicesMap[vidPidKey]
+    if (!layoutFile) {
+      return { ok: 0, error: `No layout mapping for ${vidPidKey}` }
+    }
+
+    const layoutPath = path.join(dir, layoutFile)
+    if (!fs.existsSync(layoutPath)) {
+      return { ok: 0, error: `Layout file not found: ${layoutPath}` }
+    }
+
+    const layoutJson = JSON.parse(fs.readFileSync(layoutPath, 'utf8'))
+
+    // ===== FIX: schema2 overlays.{view}.image, fallback schema1 overlay.image =====
+    let imageName = null
+
+    if (layoutJson && layoutJson.overlays && typeof layoutJson.overlays === 'object') {
+      const keys = Object.keys(layoutJson.overlays)
+      if (keys.length) {
+        const firstKey = keys[0]
+        const ov = layoutJson.overlays[firstKey]
+        if (ov && ov.image) imageName = ov.image
+      }
+    }
+
+    if (!imageName && layoutJson && layoutJson.overlay && layoutJson.overlay.image) {
+      imageName = layoutJson.overlay.image
+    }
+
+    if (!imageName) {
+      return { ok: 0, error: `Layout ${layoutFile} missing overlays[view].image (or overlay.image)` }
+    }
+    // ===========================================================================
+
+    const imagePath = path.join(dir, imageName)
+    if (!fs.existsSync(imagePath)) {
+      return { ok: 0, error: `Overlay image not found: ${imagePath}` }
+    }
+
+    const imageUrl = pathToFileURL(imagePath).toString()
+
+    return { ok: 1, layoutFile, layoutJson, imageUrl }
+  } catch (err) {
+    return { ok: 0, error: err?.message || String(err) }
+  }
+})
+
 
 ipcMain.on('changePage', async (receivedData) => {
   setTimeout(() => {
