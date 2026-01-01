@@ -233,9 +233,15 @@ try {
     // build group boxes once
     for (const gid in groups) {
       const box = document.createElement('div')
-      box.setAttribute('class', 'joy_group_box w3-text-orange font-BLOCKY')
+      box.setAttribute('class', 'joy_group_box w3-text-orange font-BLOCKY joygroupbox')
       box.setAttribute('id', `${prefix}_group_${gid}`)
-      box.innerText = `${groups[gid].label || gid}`
+
+      // ✅ group title in its own span (no product involved)
+      const titleSpan = document.createElement('span')
+      titleSpan.className = 'joygroupbox-title'
+      titleSpan.textContent = `${groups[gid].label || gid}`
+      box.appendChild(titleSpan)
+
       groupHost.appendChild(box)
       groupBoxEls.set(gid, box)
     }
@@ -279,8 +285,7 @@ try {
 
     // device image
     const img = document.createElementNS('http://www.w3.org/2000/svg', 'image')
-    // TEST: log the real PNG dimensions
-    img.addEventListener('load', () => console.log(prefix, 'PNG natural size:', img.width.baseVal.value, img.height.baseVal.value))
+    
     img.setAttribute('href', imageUrl)
     img.setAttribute('x', '0')
     img.setAttribute('y', '0')
@@ -329,541 +334,908 @@ try {
   }
 
 
-ipcRenderer.on('from_brain-detection', async package => {
-  try {
-    const st = layoutState.byPrefix.get(package.prefix)
+    ipcRenderer.on('from_brain-detection', async package => {
+      try {
+        const st = layoutState.byPrefix.get(package.prefix)
 
-    // Prefer SVG overlay spot if layout is loaded
-    if (st) {
+        // Prefer SVG overlay spot if layout is loaded
+        if (st) {
 
-      // STATE: per device-layout, per input
-      if (!st.inputEventState) st.inputEventState = new Map()
+          // STATE: per device-layout, per input
+          if (!st.inputEventState) st.inputEventState = new Map()
 
-      function decryptInputs() {
-        const input = package.joyInput.split('_')
-        if (input[1] == 'axis') {
-          return "Axis" + input[2].toUpperCase()
-        } else {
-          return input[1].toUpperCase()
-        }
-      }
+          // GLOBAL: only 1 active bind span per joystick/prefix
+          if (!st.activeBindSpanId) st.activeBindSpanId = ''
 
-      let binds = articulation()
-      function articulation() {
-        const bindStack = []
+          // SPOT LABEL STATE
+          if (!st.spotTextEls) st.spotTextEls = new Map()
+          if (!st.activeSpotLabelJoyInputId) st.activeSpotLabelJoyInputId = ''
 
-        if (package.keybindArray != 0) {
-          package.keybindArray.forEach(item => {
-            item.actions.forEach(act => {
-              bindStack.push({ [item.categoryName]: { action: act } })
-            })
-          })
+          // NEW: hide/show tracking for spots
+          if (!st.hiddenSpotsInitialized) st.hiddenSpotsInitialized = 0
+          if (!st.visibleSpotId) st.visibleSpotId = '' // normalized spot id (ex: button_1)
+          if (!st.groupVisibleSpotIds) st.groupVisibleSpotIds = new Map() // gid -> Set(spotId)
 
-          let screenReady = ''
-          const groupedActions = {}
+          // NEW: hide/show tracking for group boxes
+          if (!st.hiddenGroupsInitialized) st.hiddenGroupsInitialized = 0
+          if (!st.visibleGroupId) st.visibleGroupId = null
 
-          bindStack.forEach(item => {
-            for (const category in item) {
-              if (!groupedActions[category]) groupedActions[category] = []
-              groupedActions[category].push(item[category].action)
+          // You MUST have the svg that contains your <rect class="joy_spot" data-spotid="...">
+          const svgRoot =
+            st.svgRoot ||
+            st.svgEl ||
+            st.overlaySvg ||
+            (st.containerEl ? st.containerEl.querySelector('svg') : null) ||
+            document.querySelector('svg') ||
+            null
+
+          function decryptInputs() {
+            const input = package.joyInput.split('_')
+            if (input[1] == 'axis') {
+              return 'Axis' + input[2].toUpperCase()
+            } else {
+              return input[1].toUpperCase()
             }
-          })
+          }
 
-          for (const category in groupedActions) {
-            if (package.keybindArticulation) {
-              const cat = package.keybindArticulation.categories[category]
-              if (cat) screenReady += `${cat}\n`
-              else screenReady += `${package.detection} CAT: ${category}\n`
+          let binds = articulation()
+          function articulation() {
+            const bindStack = []
 
-              groupedActions[category].forEach(action => {
-                const act = package.keybindArticulation.actions[action]
-                if (act) screenReady += `-> ${act}\n`
-                else screenReady += `- ! ! ! ACTION ! ! !: ${action}\n`
+            if (package.keybindArray != 0) {
+              package.keybindArray.forEach(item => {
+                item.actions.forEach(act => {
+                  bindStack.push({ [item.categoryName]: { action: act } })
+                })
+              })
+
+              let screenReady = ''
+              const groupedActions = {}
+
+              bindStack.forEach(item => {
+                for (const category in item) {
+                  if (!groupedActions[category]) groupedActions[category] = []
+                  groupedActions[category].push(item[category].action)
+                }
+              })
+
+              for (const category in groupedActions) {
+                if (package.keybindArticulation) {
+                  const cat = package.keybindArticulation.categories[category]
+                  if (cat) screenReady += `${cat}\n`
+                  else screenReady += `${package.detection} CAT: ${category}\n`
+
+                  groupedActions[category].forEach(action => {
+                    const act = package.keybindArticulation.actions[action]
+                    if (act) screenReady += `-> ${act}\n`
+                    else screenReady += `- ! ! ! ACTION ! ! !: ${action}\n`
+                  })
+                }
+              }
+              return screenReady
+            } else {
+              return package.joyInput
+            }
+          }
+
+          const decrypt = decryptInputs()
+
+          // ===== JOYSPOT LABELS (FULL, MULTILINE, KEEPS YOUR FORMATTING) =====
+
+          function normalizeSpotId(st, joyInputId) {
+            const s = String(joyInputId || '')
+            const p = String(st?.prefix || '')
+
+            // if joyInput is "js1_button_1" but SVG uses "button_1"
+            if (p && s.startsWith(p + '_')) return s.slice(p.length + 1)
+            if (p && s.startsWith(p)) return s.slice(p.length)
+
+            return s
+          }
+
+          function ensureSpotTextLayer(st, svgRoot) {
+            if (!svgRoot) return null
+            if (st.spotTextLayer) return st.spotTextLayer
+
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g')
+            g.setAttribute('class', 'joy_spot_text_layer')
+            svgRoot.appendChild(g)
+
+            st.spotTextLayer = g
+            return g
+          }
+
+          function ensureTextForSpot(st, svgRoot, joyInputId) {
+            if (!svgRoot) return null
+
+            let t = st.spotTextEls.get(joyInputId)
+            if (t) return t
+
+            const spotId = normalizeSpotId(st, joyInputId)
+            t = st.spotTextEls.get(spotId)
+            if (t) return t
+
+            let spotEl = null
+            if (st.spotEls) {
+              spotEl = st.spotEls.get(joyInputId) || st.spotEls.get(spotId) || null
+            }
+            if (!spotEl) {
+              spotEl = svgRoot.querySelector(`[data-spotid="${spotId}"]`)
+            }
+            if (!spotEl) return null
+
+            const layer = ensureSpotTextLayer(st, svgRoot)
+            if (!layer) return null
+
+            // ---- create background rect behind the label ----
+            const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+            bg.setAttribute('class', 'joy_spot_label_bg')
+            bg.style.pointerEvents = 'none'
+            layer.appendChild(bg)
+
+            // ---- create the text ----
+            t = document.createElementNS('http://www.w3.org/2000/svg', 'text')
+            t.setAttribute('class', 'joy_spot_label')
+
+            // CHANGED: left-justify
+            t.setAttribute('text-anchor', 'start')
+            t.setAttribute('dominant-baseline', 'middle')
+
+            t.style.pointerEvents = 'none'
+            layer.appendChild(t)
+
+            // store refs
+            t.__bg = bg
+
+            // store the center of the spot so we can vertically center the block,
+            // but x will be updated after we measure
+            const bb = spotEl.getBBox()
+            const cx = bb.x + bb.width / 2
+            const cy = bb.y + bb.height / 2
+            t.__spotCx = cx
+            t.__spotCy = cy
+
+            // initial placement (will be refined in setSpotLabel)
+            t.setAttribute('x', String(cx))
+            t.setAttribute('y', String(cy))
+
+            st.spotTextEls.set(joyInputId, t)
+            st.spotTextEls.set(spotId, t)
+
+            return t
+          }
+
+          function setSpotLabel(st, svgRoot, joyInputId, decrypt, binds) {
+            const t = ensureTextForSpot(st, svgRoot, joyInputId)
+            if (!t) return
+
+            const d = String(decrypt || '').replace(/\r\n/g, '\n').trimEnd()
+            const b = String((binds && binds !== 0) ? binds : '').replace(/\r\n/g, '\n').trimEnd()
+
+            let raw = d
+            if (b && b !== String(joyInputId || '').trim()) {
+              raw = d ? `${d}\n${b}` : b
+            } else if (!raw) {
+              raw = String(joyInputId || '')
+            }
+
+            while (t.firstChild) t.removeChild(t.firstChild)
+
+            const lines = raw.split('\n')
+            const lineHeightEm = 1.1
+            const firstDy = -((lines.length - 1) * lineHeightEm) / 2
+
+            // TEMP build with x placeholder; we’ll correct x after measuring
+            for (let i = 0; i < lines.length; i++) {
+              const span = document.createElementNS('http://www.w3.org/2000/svg', 'tspan')
+
+              // x gets overwritten after measuring
+              span.setAttribute('x', t.getAttribute('x') || '0')
+
+              if (i === 0) span.setAttribute('dy', `${firstDy}em`)
+              else span.setAttribute('dy', `${lineHeightEm}em`)
+
+              span.textContent = (lines[i] === '') ? ' ' : lines[i]
+              t.appendChild(span)
+            }
+
+            // ensure visible before measuring (display:none breaks getBBox)
+            if (t.style.display === 'none') t.style.display = ''
+            if (t.__bg && t.__bg.style.display === 'none') t.__bg.style.display = ''
+
+            // measure the text as currently built
+            const textBox = t.getBBox()
+
+            const padX = 8
+            const padY = 5
+
+            // target: center the whole bg on the spot center, but LEFT-JUSTIFY text inside bg
+            const cx = (typeof t.__spotCx === 'number') ? t.__spotCx : (textBox.x + textBox.width / 2)
+            const cy = (typeof t.__spotCy === 'number') ? t.__spotCy : (textBox.y + textBox.height / 2)
+
+            const bgW = textBox.width + padX * 2
+            const bgH = textBox.height + padY * 2
+
+            const bgX = cx - bgW / 2
+            const bgY = cy - bgH / 2
+
+            const bg = t.__bg
+            if (bg) {
+              bg.setAttribute('x', String(bgX))
+              bg.setAttribute('y', String(bgY))
+              bg.setAttribute('width', String(bgW))
+              bg.setAttribute('height', String(bgH))
+            }
+
+            // left edge for text inside bg
+            const textX = bgX + padX
+
+            // set the text anchor point to left edge + keep y centered
+            t.setAttribute('x', String(textX))
+            t.setAttribute('y', String(cy))
+
+            // update every tspan to the same left x
+            const tspans = t.querySelectorAll('tspan')
+            tspans.forEach(span => span.setAttribute('x', String(textX)))
+          }
+
+
+          function highlightSpotLabel(st, svgRoot, joyInputId) {
+            const prevId = st.activeSpotLabelJoyInputId
+            if (prevId && prevId !== joyInputId) {
+              const prev = st.spotTextEls.get(prevId) || st.spotTextEls.get(normalizeSpotId(st, prevId))
+              if (prev) {
+                prev.classList.remove('active')
+                if (prev.__bg) prev.__bg.classList.remove('active')
+              }
+            }
+
+            const cur = st.spotTextEls.get(joyInputId) || st.spotTextEls.get(normalizeSpotId(st, joyInputId))
+            if (cur) {
+              cur.classList.add('active')
+              if (cur.__bg) cur.__bg.classList.add('active')
+            }
+
+            st.activeSpotLabelJoyInputId = joyInputId
+          }
+
+          // ===== END JOYSPOT LABELS =====
+
+          // ===== HIDE ALL SPOTS, SHOW ONLY ACTIVE (AND CLEAN UP PREV GROUP SPOTS) =====
+
+          function setSpotVisible(spotEl, visible) {
+            if (!spotEl) return
+            if (visible) {
+              spotEl.style.display = ''
+              spotEl.style.visibility = 'visible'
+              spotEl.style.opacity = '1'
+              spotEl.style.pointerEvents = 'auto'
+            } else {
+              spotEl.style.display = 'none'
+            }
+          }
+
+          // FIX: hide/show text + its background box together
+          function setTextVisible(t, visible) {
+            if (!t) return
+            const bg = t.__bg || null
+
+            if (visible) {
+              t.style.display = ''
+              t.style.visibility = 'visible'
+              t.style.opacity = '1'
+
+              if (bg) {
+                bg.style.display = ''
+                bg.style.visibility = 'visible'
+                bg.style.opacity = '1'
+              }
+            } else {
+              t.style.display = 'none'
+              if (bg) bg.style.display = 'none'
+            }
+          }
+
+          function hideAllSpotsOnce(st, svgRoot) {
+            if (st.hiddenSpotsInitialized) return
+            st.hiddenSpotsInitialized = 1
+
+            if (st.spotEls && typeof st.spotEls.forEach === 'function') {
+              st.spotEls.forEach(el => setSpotVisible(el, false))
+            } else if (svgRoot) {
+              svgRoot.querySelectorAll('.joy_spot').forEach(el => setSpotVisible(el, false))
+            }
+
+            // also hide any already-created label elements (text + bg)
+            if (st.spotTextEls && typeof st.spotTextEls.forEach === 'function') {
+              st.spotTextEls.forEach(t => setTextVisible(t, false))
+            }
+          }
+
+          function findSpotEl(st, svgRoot, anyId) {
+            const spotId = normalizeSpotId(st, anyId)
+            if (st.spotEls) {
+              const el = st.spotEls.get(anyId) || st.spotEls.get(spotId)
+              if (el) return el
+            }
+            if (svgRoot) {
+              const el = svgRoot.querySelector(`[data-spotid="${spotId}"]`)
+              if (el) return el
+            }
+            return null
+          }
+
+          function findSpotTextEl(st, anyId) {
+            const spotId = normalizeSpotId(st, anyId)
+            return st.spotTextEls.get(anyId) || st.spotTextEls.get(spotId) || null
+          }
+
+          function hideSpotById(st, svgRoot, anyId) {
+            const spotId = normalizeSpotId(st, anyId)
+
+            const el = findSpotEl(st, svgRoot, spotId)
+            setSpotVisible(el, false)
+
+            // FIX: hides text + bg together
+            const t = findSpotTextEl(st, spotId)
+            setTextVisible(t, false)
+          }
+
+          function hideAllSpotsForGroup(st, svgRoot, gid) {
+            if (!gid) return
+            const set = st.groupVisibleSpotIds.get(gid)
+            if (!set) return
+
+            set.forEach(spotId => hideSpotById(st, svgRoot, spotId))
+            set.clear()
+          }
+
+          hideAllSpotsOnce(st, svgRoot)
+
+          // ===== GROUP BOX SHOW ONLY ACTIVE =====
+
+          function setGroupBoxVisible(el, visible) {
+            if (!el) return
+            el.style.display = visible ? '' : 'none'
+          }
+
+          function hideAllGroupsOnce(st) {
+            if (st.hiddenGroupsInitialized) return
+            st.hiddenGroupsInitialized = 1
+
+            if (st.groupBoxEls && typeof st.groupBoxEls.forEach === 'function') {
+              st.groupBoxEls.forEach(el => setGroupBoxVisible(el, false))
+            } else {
+              document.querySelectorAll('.joy_group_box').forEach(el => setGroupBoxVisible(el, false))
+            }
+          }
+
+          hideAllGroupsOnce(st)
+
+          // ===== END GROUPS =====
+
+          function inputKindFromJoyInput(joyInput) {
+            const s = String(joyInput || '')
+            const parts = s.split('_')
+            const k = (parts[1] || '').toLowerCase()
+
+            if (k === 'axis') return 'axis'
+            if (k === 'button' || k.startsWith('button') || k === 'btn' || k.startsWith('btn')) return 'button'
+            if (/(^|[_-])button(\d+)?($|[_-])/i.test(s)) return 'button'
+            if (/(^|[_-])btn(\d+)?($|[_-])/i.test(s)) return 'button'
+            if (/(^|[_-])axis($|[_-])/i.test(s)) return 'axis'
+
+            return parts[1] || ''
+          }
+
+          function buttonNumberFromJoyInput(joyInput) {
+            const s = String(joyInput || '')
+
+            let m = s.match(/(?:^|[_-])button(?:[_-])?(\d+)(?:$|[_-])/i)
+            if (!m) m = s.match(/button(\d+)/i)
+            if (!m) m = s.match(/(?:^|[_-])btn(?:[_-])?(\d+)(?:$|[_-])/i)
+            if (!m) m = s.match(/btn(\d+)/i)
+
+            if (m && m[1] != null) {
+              const n = Number(m[1])
+              if (Number.isFinite(n)) return n
+            }
+
+            const nums = s.match(/(\d+)/g)
+            if (nums && nums.length) {
+              const n = Number(nums[nums.length - 1])
+              if (Number.isFinite(n)) return n
+            }
+
+            return null
+          }
+
+          function readNumericValue(pkg) {
+            if (typeof pkg.value === 'number') return pkg.value
+            if (typeof pkg.axisValue === 'number') return pkg.axisValue
+            if (typeof pkg.val === 'number') return pkg.val
+            if (typeof pkg.raw === 'number') return pkg.raw
+            if (typeof pkg.rawValue === 'number') return pkg.rawValue
+            return null
+          }
+
+          function readPressed(pkg) {
+            if (typeof pkg.pressed === 'boolean') return pkg.pressed
+            if (typeof pkg.isPressed === 'boolean') return pkg.isPressed
+            if (typeof pkg.down === 'boolean') return pkg.down
+            if (typeof pkg.isDown === 'boolean') return pkg.isDown
+            if (typeof pkg.state === 'string') {
+              if (pkg.state.toLowerCase() === 'down') return true
+              if (pkg.state.toLowerCase() === 'up') return false
+            }
+            if (typeof pkg.value === 'number') {
+              if (pkg.value === 1) return true
+              if (pkg.value === 0) return false
+            }
+            return null
+          }
+
+          function shouldLogAxisEvent(prevState, currentVal, pkg) {
+            let min = 0
+            let max = 60000
+            let center = 30000
+
+            if (typeof pkg.logicalMin === 'number') min = pkg.logicalMin
+            if (typeof pkg.logicalMax === 'number') max = pkg.logicalMax
+            if (typeof pkg.min === 'number') min = pkg.min
+            if (typeof pkg.max === 'number') max = pkg.max
+            if (typeof pkg.center === 'number') center = pkg.center
+
+            const range = max - min
+            if (!range) return false
+
+            const deadzonePct = 0.10
+            const stepPct = 0.04
+
+            const deadzone = range * deadzonePct
+            const step = range * stepPct
+
+            const distFromCenter = Math.abs(currentVal - center)
+            const activeNow = distFromCenter > deadzone
+
+            let dirNow = 0
+            if (currentVal > center + deadzone) dirNow = 1
+            if (currentVal < center - deadzone) dirNow = -1
+
+            if (!prevState) {
+              if (activeNow) return true
+              return false
+            }
+
+            if (!prevState.axisActive && activeNow) return true
+            if (prevState.axisActive && !activeNow) return true
+
+            if (activeNow) {
+              if (prevState.axisDir !== dirNow) return true
+              if (typeof prevState.lastLoggedVal === 'number') {
+                const delta = Math.abs(currentVal - prevState.lastLoggedVal)
+                if (delta >= step) return true
+              } else {
+                return true
+              }
+            }
+
+            return false
+          }
+
+          function ensureBindLog(boxEl) {
+            let logEl = boxEl.querySelector('.bind_log')
+            if (!logEl) {
+              logEl = document.createElement('div')
+              logEl.className = 'bind_log'
+              boxEl.appendChild(logEl)
+            }
+
+            let btnEl = logEl.querySelector('.bind_log_buttons')
+            if (!btnEl) {
+              btnEl = document.createElement('div')
+              btnEl.className = 'bind_log_buttons'
+              logEl.appendChild(btnEl)
+            }
+
+            let axisEl = logEl.querySelector('.bind_log_axis')
+            if (!axisEl) {
+              axisEl = document.createElement('div')
+              axisEl.className = 'bind_log_axis'
+              logEl.appendChild(axisEl)
+            }
+
+            return { logEl, btnEl, axisEl }
+          }
+
+          function spanIdFromJoyInput(joyInput) {
+            const raw = String(joyInput || '')
+            const safe = raw.replace(/[^a-zA-Z0-9\-_:.]/g, '_')
+            return `bind_${safe}`
+          }
+
+          function ensureSpanForJoyInput(btnEl, axisEl, joyInputId, kind, btnNum) {
+            const spanId = spanIdFromJoyInput(joyInputId)
+            let span = document.getElementById(spanId)
+
+            if (!span) {
+              span = document.createElement('span')
+              span.id = spanId
+              span.className = 'bind_entry w3-text-orange'
+              span.dataset.joyinput = joyInputId
+
+              if (kind === 'button') {
+                if (btnNum != null) span.dataset.btn = String(btnNum)
+                btnEl.appendChild(span)
+              } else {
+                axisEl.appendChild(span)
+              }
+            } else {
+              span.classList.add('bind_entry')
+              span.classList.add('w3-text-orange')
+              span.classList.remove('bind_active')
+              span.dataset.joyinput = joyInputId
+
+              if (kind === 'button' && btnNum != null) span.dataset.btn = String(btnNum)
+            }
+
+            return span
+          }
+
+          function resortButtons(btnEl) {
+            const kids = Array.from(btnEl.children)
+
+            kids.sort((a, b) => {
+              const av = (a.dataset && a.dataset.btn != null) ? Number(a.dataset.btn) : Number.POSITIVE_INFINITY
+              const bv = (b.dataset && b.dataset.btn != null) ? Number(b.dataset.btn) : Number.POSITIVE_INFINITY
+
+              if (av !== bv) return av - bv
+
+              const aid = (a.dataset && a.dataset.joyinput) ? a.dataset.joyinput : ''
+              const bid = (b.dataset && b.dataset.joyinput) ? b.dataset.joyinput : ''
+              if (aid < bid) return -1
+              if (aid > bid) return 1
+              return 0
+            })
+
+            kids.forEach(el => btnEl.appendChild(el))
+          }
+
+          function highlightActiveGlobal(st, joyInputId) {
+            const newId = spanIdFromJoyInput(joyInputId)
+
+            if (st.activeBindSpanId && st.activeBindSpanId !== newId) {
+              const prevEl = document.getElementById(st.activeBindSpanId)
+              if (prevEl) {
+                prevEl.classList.remove('bind_active')
+                prevEl.classList.add('w3-text-orange')
+              }
+            }
+
+            const curEl = document.getElementById(newId)
+            if (curEl) {
+              curEl.classList.remove('w3-text-orange')
+              curEl.classList.add('bind_active')
+            }
+
+            st.activeBindSpanId = newId
+          }
+
+          // ===== start =====
+          const joyInputId = package.joyInput
+          const spotId = normalizeSpotId(st, joyInputId)
+          const spotEl = findSpotEl(st, svgRoot, joyInputId)
+
+          if (spotEl) {
+            const gid = st.inputToGroup.get(joyInputId) || st.inputToGroup.get(spotId) || null
+            const boxEl = gid ? st.groupBoxEls.get(gid) : null
+
+            // If group changed, hide ALL spots that were shown for the previous group
+            if (st.visibleGroupId && gid && st.visibleGroupId !== gid) {
+              hideAllSpotsForGroup(st, svgRoot, st.visibleGroupId)
+            }
+
+            // Hide previously visible single spot (spot + text + bg)
+            if (st.visibleSpotId && st.visibleSpotId !== spotId) {
+              hideSpotById(st, svgRoot, st.visibleSpotId)
+            }
+
+            // Track this spot as visible for this group (so we can nuke the whole group's shown spots on switch)
+            if (gid) {
+              let set = st.groupVisibleSpotIds.get(gid)
+              if (!set) {
+                set = new Set()
+                st.groupVisibleSpotIds.set(gid, set)
+              }
+              set.add(spotId)
+            }
+
+            // Show current spot
+            setSpotVisible(spotEl, true)
+
+            // Ensure label exists, SHOW it (text+bg), then set label (so getBBox always works)
+            const t = ensureTextForSpot(st, svgRoot, joyInputId)
+            setTextVisible(t, true)
+
+            setSpotLabel(st, svgRoot, joyInputId, decrypt, binds)
+            highlightSpotLabel(st, svgRoot, joyInputId)
+
+            st.visibleSpotId = spotId
+
+            // SHOW ONLY THIS GROUP BOX, REHIDE THE PREVIOUS ONE
+            if (gid && st.visibleGroupId && st.visibleGroupId !== gid) {
+              const prevBox = st.groupBoxEls ? st.groupBoxEls.get(st.visibleGroupId) : null
+              setGroupBoxVisible(prevBox, false)
+            }
+            if (gid && boxEl) {
+              setGroupBoxVisible(boxEl, true)
+              st.visibleGroupId = gid
+            }
+
+            // LATCHED GROUP/SPOT HIGHLIGHT (your existing logic)
+            if (st.activeGroupId !== gid) {
+              if (st.activeGroupId) {
+                const oldBox = st.groupBoxEls.get(st.activeGroupId)
+                if (oldBox) oldBox.classList.remove('active')
+              }
+              if (st.activeSpotJoyInputId) {
+                const oldSpot =
+                  (st.spotEls && (st.spotEls.get(st.activeSpotJoyInputId) || st.spotEls.get(normalizeSpotId(st, st.activeSpotJoyInputId)))) ||
+                  null
+                if (oldSpot) oldSpot.classList.remove('active')
+              }
+              st.activeGroupId = gid
+              st.activeSpotJoyInputId = null
+            } else {
+              if (st.activeSpotJoyInputId && st.activeSpotJoyInputId !== joyInputId) {
+                const oldSpot =
+                  (st.spotEls && (st.spotEls.get(st.activeSpotJoyInputId) || st.spotEls.get(normalizeSpotId(st, st.activeSpotJoyInputId)))) ||
+                  null
+                if (oldSpot) oldSpot.classList.remove('active')
+              }
+            }
+
+            if (boxEl) boxEl.classList.add('active')
+            spotEl.classList.add('active')
+            st.activeSpotJoyInputId = joyInputId
+
+            if (boxEl) {
+              const parts = ensureBindLog(boxEl)
+              const btnEl = parts.btnEl
+              const axisEl = parts.axisEl
+
+              const kind = inputKindFromJoyInput(joyInputId)
+              const prev = st.inputEventState.get(joyInputId)
+
+              const btnNumForId = (kind === 'button') ? buttonNumberFromJoyInput(joyInputId) : null
+
+              ensureSpanForJoyInput(btnEl, axisEl, joyInputId, kind, btnNumForId)
+
+              if (kind === 'button') resortButtons(btnEl)
+
+              highlightActiveGlobal(st, joyInputId)
+
+              if (kind === 'button') {
+                const pressed = readPressed(package)
+                let shouldUpdateText = false
+
+                if (pressed !== null) {
+                  if (!prev) {
+                    if (pressed) shouldUpdateText = true
+                  } else {
+                    if (!prev.pressed && pressed) shouldUpdateText = true
+                  }
+
+                  const next = prev || {}
+                  next.pressed = pressed
+                  st.inputEventState.set(joyInputId, next)
+                } else {
+                  const entryText = `${decrypt}\n${binds}`
+                  if (!prev || prev.lastText !== entryText) shouldUpdateText = true
+
+                  const next = prev || {}
+                  next.lastText = entryText
+                  st.inputEventState.set(joyInputId, next)
+                }
+
+                if (shouldUpdateText) {
+                  const spanId = spanIdFromJoyInput(joyInputId)
+                  const span = document.getElementById(spanId)
+                  if (span) span.textContent = `${decrypt}\n${binds}`
+
+                  resortButtons(btnEl)
+                  highlightActiveGlobal(st, joyInputId)
+
+                  // keep spot updated too
+                  setSpotLabel(st, svgRoot, joyInputId, decrypt, binds)
+                  highlightSpotLabel(st, svgRoot, joyInputId)
+                }
+              } else if (kind === 'axis') {
+                const val = readNumericValue(package)
+                let shouldUpdateText = false
+
+                if (val !== null) {
+                  shouldUpdateText = shouldLogAxisEvent(prev, val, package)
+
+                  const next = prev || {}
+
+                  let min = 0
+                  let max = 60000
+                  let center = 30000
+
+                  if (typeof package.logicalMin === 'number') min = package.logicalMin
+                  if (typeof package.logicalMax === 'number') max = package.logicalMax
+                  if (typeof package.min === 'number') min = package.min
+                  if (typeof package.max === 'number') max = package.max
+                  if (typeof package.center === 'number') center = package.center
+
+                  const range = max - min
+                  const deadzone = range * 0.10
+
+                  const distFromCenter = Math.abs(val - center)
+                  const activeNow = distFromCenter > deadzone
+
+                  let dirNow = 0
+                  if (val > center + deadzone) dirNow = 1
+                  if (val < center - deadzone) dirNow = -1
+
+                  next.axisActive = activeNow
+                  next.axisDir = dirNow
+
+                  if (shouldUpdateText) next.lastLoggedVal = val
+
+                  st.inputEventState.set(joyInputId, next)
+                } else {
+                  const entryText = `${decrypt}\n${binds}`
+                  if (!prev || prev.lastText !== entryText) shouldUpdateText = true
+
+                  const next = prev || {}
+                  next.lastText = entryText
+                  st.inputEventState.set(joyInputId, next)
+                }
+
+                if (shouldUpdateText) {
+                  const spanId = spanIdFromJoyInput(joyInputId)
+                  const span = document.getElementById(spanId)
+                  if (span) span.textContent = `${decrypt}\n${binds}`
+
+                  const MAX = 10
+                  while (axisEl.children.length > MAX) axisEl.removeChild(axisEl.lastChild)
+
+                  highlightActiveGlobal(st, joyInputId)
+
+                  setSpotLabel(st, svgRoot, joyInputId, decrypt, binds)
+                  highlightSpotLabel(st, svgRoot, joyInputId)
+                }
+              } else {
+                const entryText = `${decrypt}\n${binds}`
+                if (!prev || prev.lastText !== entryText) {
+                  const next = prev || {}
+                  next.lastText = entryText
+                  st.inputEventState.set(joyInputId, next)
+
+                  const spanId = spanIdFromJoyInput(joyInputId)
+                  const span = document.getElementById(spanId)
+                  if (span) span.textContent = entryText
+
+                  const MAX = 10
+                  while (axisEl.children.length > MAX) axisEl.removeChild(axisEl.lastChild)
+
+                  highlightActiveGlobal(st, joyInputId)
+
+                  setSpotLabel(st, svgRoot, joyInputId, decrypt, binds)
+                  highlightSpotLabel(st, svgRoot, joyInputId)
+                }
+              }
+            }
+
+            return
+          }
+        }
+
+        // Fallback: old DOM highlight
+        const node = document.getElementById(package.joyInput)
+        if (!node) {
+          recordUnplaced(package)
+        } else {
+          if (package.prefix) {
+            const prevKey = `__joyview_prev_dom_${package.prefix}`
+            const prevId = window[prevKey]
+            if (prevId && prevId !== package.joyInput) {
+              const prevNode = document.getElementById(prevId)
+              if (prevNode) prevNode.classList.remove('active')
+            }
+            window[prevKey] = package.joyInput
+          }
+          node.classList.add('active')
+        }
+
+      } catch (err) {
+        console.log(err)
+        ipcRenderer.send('renderer-response-error', serializeError(err), location)
+      }
+    })
+    ipcRenderer.on('from_brain-detection-initialize', async package => {
+      try {
+        for (const device in package) {
+          const d = package[device]
+          if (!d || !d.prefix) continue
+
+          const prefix = d.prefix
+          const product = d.product || ''
+
+          try {
+            const before = new Set(document.querySelectorAll('.joy_group_box'))
+
+            const res = await requestLayoutForDevice(d.key)
+            buildDeviceView(prefix, product, res.layoutJson, res.imageUrl)
+
+            const after = document.querySelectorAll('.joy_group_box')
+
+            after.forEach(el => {
+              if (!before.has(el)) {
+                el.classList.add('joygroupbox')
+              }
+            })
+
+            // HIDE JOYSPOTS AFTER INIT (for this device/prefix)
+            const st = layoutState.byPrefix.get(prefix)
+            if (st) {
+              if (st.spotEls && typeof st.spotEls.forEach === 'function') {
+                st.spotEls.forEach(el => {
+                  if (el) el.style.display = 'none'
+                })
+              } else {
+                // fallback: hide in DOM if map isn't available
+                const root = st.svgRoot || st.svgEl || st.overlaySvg || (st.containerEl ? st.containerEl.querySelector('svg') : null)
+                if (root) {
+                  root.querySelectorAll('.joy_spot').forEach(el => {
+                    el.style.display = 'none'
+                  })
+                } else {
+                  document.querySelectorAll('.joy_spot').forEach(el => {
+                    el.style.display = 'none'
+                  })
+                }
+              }
+            } else {
+              // final fallback if state isn't ready
+              document.querySelectorAll('.joy_spot').forEach(el => {
+                el.style.display = 'none'
               })
             }
-          }
-          return screenReady
-        } else {
-          return package.joyInput
-        }
-      }
 
-      const decrypt = decryptInputs()
-
-      function inputKindFromJoyInput(joyInput) {
-        const parts = String(joyInput || '').split('_')
-        return parts[1] || ''
-      }
-
-      function buttonNumberFromJoyInput(joyInput) {
-        const parts = String(joyInput || '').split('_')
-        for (let i = parts.length - 1; i >= 0; i--) {
-          const n = Number(parts[i])
-          if (Number.isFinite(n)) return n
-        }
-        return null
-      }
-
-      function readNumericValue(pkg) {
-        if (typeof pkg.value === 'number') return pkg.value
-        if (typeof pkg.axisValue === 'number') return pkg.axisValue
-        if (typeof pkg.val === 'number') return pkg.val
-        if (typeof pkg.raw === 'number') return pkg.raw
-        if (typeof pkg.rawValue === 'number') return pkg.rawValue
-        return null
-      }
-
-      function readPressed(pkg) {
-        if (typeof pkg.pressed === 'boolean') return pkg.pressed
-        if (typeof pkg.isPressed === 'boolean') return pkg.isPressed
-        if (typeof pkg.down === 'boolean') return pkg.down
-        if (typeof pkg.isDown === 'boolean') return pkg.isDown
-        if (typeof pkg.state === 'string') {
-          if (pkg.state.toLowerCase() === 'down') return true
-          if (pkg.state.toLowerCase() === 'up') return false
-        }
-        if (typeof pkg.value === 'number') {
-          if (pkg.value === 1) return true
-          if (pkg.value === 0) return false
-        }
-        return null
-      }
-
-      function shouldLogAxisEvent(prevState, currentVal, pkg) {
-        let min = 0
-        let max = 60000
-        let center = 30000
-
-        if (typeof pkg.logicalMin === 'number') min = pkg.logicalMin
-        if (typeof pkg.logicalMax === 'number') max = pkg.logicalMax
-        if (typeof pkg.min === 'number') min = pkg.min
-        if (typeof pkg.max === 'number') max = pkg.max
-        if (typeof pkg.center === 'number') center = pkg.center
-
-        const range = max - min
-        if (!range) return false
-
-        const deadzonePct = 0.10
-        const stepPct = 0.04
-
-        const deadzone = range * deadzonePct
-        const step = range * stepPct
-
-        const distFromCenter = Math.abs(currentVal - center)
-        const activeNow = distFromCenter > deadzone
-
-        let dirNow = 0
-        if (currentVal > center + deadzone) dirNow = 1
-        if (currentVal < center - deadzone) dirNow = -1
-
-        if (!prevState) {
-          if (activeNow) return true
-          return false
-        }
-
-        if (!prevState.axisActive && activeNow) return true
-        if (prevState.axisActive && !activeNow) return true
-
-        if (activeNow) {
-          if (prevState.axisDir !== dirNow) return true
-          if (typeof prevState.lastLoggedVal === 'number') {
-            const delta = Math.abs(currentVal - prevState.lastLoggedVal)
-            if (delta >= step) return true
-          } else {
-            return true
-          }
-        }
-
-        return false
-      }
-
-      function ensureBindLog(boxEl) {
-        let logEl = boxEl.querySelector('.bind_log')
-        if (!logEl) {
-          logEl = document.createElement('div')
-          logEl.className = 'bind_log'
-          boxEl.appendChild(logEl)
-        }
-        return logEl
-      }
-
-      function spanIdFromJoyInput(joyInput) {
-        const raw = String(joyInput || '')
-        const safe = raw.replace(/[^a-zA-Z0-9\-_:.]/g, '_')
-        return `bind_${safe}`
-      }
-
-      // Guarantee a span exists for this joyInput so highlight can always find it
-      function ensureSpanForJoyInput(logEl, joyInputId, btnNum) {
-        const spanId = spanIdFromJoyInput(joyInputId)
-        let span = document.getElementById(spanId)
-
-        if (!span) {
-          span = document.createElement('span')
-          span.id = spanId
-          span.className = 'bind_entry w3-text-orange'
-          span.dataset.joyinput = joyInputId
-          if (btnNum != null) span.dataset.btn = String(btnNum)
-          logEl.appendChild(span)
-        } else {
-          span.classList.add('bind_entry')
-          span.classList.add('w3-text-orange')
-          span.classList.remove('bind_active')
-          span.dataset.joyinput = joyInputId
-          if (btnNum != null) span.dataset.btn = String(btnNum)
-        }
-
-        return span
-      }
-
-      function resortButtons(logEl) {
-        const kids = Array.from(logEl.children)
-
-        kids.sort((a, b) => {
-          const av = (a.dataset && a.dataset.btn != null) ? Number(a.dataset.btn) : Number.POSITIVE_INFINITY
-          const bv = (b.dataset && b.dataset.btn != null) ? Number(b.dataset.btn) : Number.POSITIVE_INFINITY
-
-          if (av !== bv) return av - bv
-
-          const aid = (a.dataset && a.dataset.joyinput) ? a.dataset.joyinput : ''
-          const bid = (b.dataset && b.dataset.joyinput) ? b.dataset.joyinput : ''
-          if (aid < bid) return -1
-          if (aid > bid) return 1
-          return 0
-        })
-
-        kids.forEach(el => logEl.appendChild(el))
-      }
-
-      // Toggle correctly EVERY event:
-      // - all orange
-      // - current green (found by id from joyInput)
-      function highlightActiveInGroup(boxEl, joyInputId) {
-        const logEl = boxEl.querySelector('.bind_log')
-        if (!logEl) return
-
-        const all = logEl.querySelectorAll('.bind_entry')
-        all.forEach(el => {
-          el.classList.remove('bind_active')
-          el.classList.add('w3-text-orange')
-        })
-
-        const activeId = spanIdFromJoyInput(joyInputId)
-        const activeEl = document.getElementById(activeId)
-        if (activeEl) {
-          activeEl.classList.remove('w3-text-orange')
-          activeEl.classList.add('bind_active')
-        }
-      }
-
-      //!##### start
-      const joyInputId = package.joyInput
-      const spotEl = st.spotEls.get(joyInputId)
-
-      if (spotEl) {
-        const gid = st.inputToGroup.get(joyInputId) || null
-        const boxEl = gid ? st.groupBoxEls.get(gid) : null
-
-        // LATCHED GROUP/SPOT HIGHLIGHT
-        if (st.activeGroupId !== gid) {
-          if (st.activeGroupId) {
-            const oldBox = st.groupBoxEls.get(st.activeGroupId)
-            if (oldBox) oldBox.classList.remove('active')
-          }
-          if (st.activeSpotJoyInputId) {
-            const oldSpot = st.spotEls.get(st.activeSpotJoyInputId)
-            if (oldSpot) oldSpot.classList.remove('active')
-          }
-          st.activeGroupId = gid
-          st.activeSpotJoyInputId = null
-        } else {
-          if (st.activeSpotJoyInputId && st.activeSpotJoyInputId !== joyInputId) {
-            const oldSpot = st.spotEls.get(st.activeSpotJoyInputId)
-            if (oldSpot) oldSpot.classList.remove('active')
-          }
-        }
-
-        if (boxEl) boxEl.classList.add('active')
-        spotEl.classList.add('active')
-        st.activeSpotJoyInputId = joyInputId
-
-        if (boxEl) {
-          const logEl = ensureBindLog(boxEl)
-
-          const kind = inputKindFromJoyInput(joyInputId)
-          const prev = st.inputEventState.get(joyInputId)
-
-          // Ensure span exists for current input BEFORE highlight (so toggle always works)
-          const btnNumForId = (kind === 'button') ? buttonNumberFromJoyInput(joyInputId) : null
-          ensureSpanForJoyInput(logEl, joyInputId, btnNumForId)
-
-          // Now toggle colors EVERY event
-          highlightActiveInGroup(boxEl, joyInputId)
-
-          if (kind === 'button') {
-            const pressed = readPressed(package)
-            let shouldUpdateText = false
-
-            if (pressed !== null) {
-              if (!prev) {
-                if (pressed) shouldUpdateText = true
-              } else {
-                if (!prev.pressed && pressed) shouldUpdateText = true
-              }
-
-              const next = prev || {}
-              next.pressed = pressed
-              st.inputEventState.set(joyInputId, next)
+            // HIDE ALL GROUP BOXES AFTER INIT (for this device/prefix)
+            if (st && st.groupBoxEls && typeof st.groupBoxEls.forEach === 'function') {
+              st.groupBoxEls.forEach(el => {
+                if (el) el.style.display = 'none'
+              })
             } else {
-              const entryText = `${decrypt}\n${binds}`
-              if (!prev || prev.lastText !== entryText) shouldUpdateText = true
-
-              const next = prev || {}
-              next.lastText = entryText
-              st.inputEventState.set(joyInputId, next)
+              // fallback: hide any boxes we just created (best effort)
+              after.forEach(el => {
+                if (!before.has(el)) {
+                  el.style.display = 'none'
+                }
+              })
             }
 
-            if (shouldUpdateText) {
-              const spanId = spanIdFromJoyInput(joyInputId)
-              const span = document.getElementById(spanId)
-              if (span) {
-                span.textContent = `${decrypt}\n${binds}`
-              }
-
-              // keep sorted when button text changes / new entry appears
-              resortButtons(logEl)
-
-              // re-toggle after resort just to be bulletproof
-              highlightActiveInGroup(boxEl, joyInputId)
-            }
-          } else if (kind === 'axis') {
-            const val = readNumericValue(package)
-            let shouldUpdateText = false
-
-            if (val !== null) {
-              shouldUpdateText = shouldLogAxisEvent(prev, val, package)
-
-              const next = prev || {}
-
-              let min = 0
-              let max = 60000
-              let center = 30000
-
-              if (typeof package.logicalMin === 'number') min = package.logicalMin
-              if (typeof package.logicalMax === 'number') max = package.logicalMax
-              if (typeof package.min === 'number') min = package.min
-              if (typeof package.max === 'number') max = package.max
-              if (typeof package.center === 'number') center = package.center
-
-              const range = max - min
-              const deadzone = range * 0.10
-
-              const distFromCenter = Math.abs(val - center)
-              const activeNow = distFromCenter > deadzone
-
-              let dirNow = 0
-              if (val > center + deadzone) dirNow = 1
-              if (val < center - deadzone) dirNow = -1
-
-              next.axisActive = activeNow
-              next.axisDir = dirNow
-
-              if (shouldUpdateText) next.lastLoggedVal = val
-
-              st.inputEventState.set(joyInputId, next)
-            } else {
-              const entryText = `${decrypt}\n${binds}`
-              if (!prev || prev.lastText !== entryText) shouldUpdateText = true
-
-              const next = prev || {}
-              next.lastText = entryText
-              st.inputEventState.set(joyInputId, next)
+            // track active group for this prefix so detection can show/rehide cleanly
+            if (st) {
+              if (!st.activeGroupId) st.activeGroupId = null
             }
 
-            if (shouldUpdateText) {
-              const spanId = spanIdFromJoyInput(joyInputId)
-              const span = document.getElementById(spanId)
-              if (span) {
-                span.textContent = `${decrypt}\n${binds}`
-              }
-
-              // cap list size (still applies)
-              const MAX = 10
-              while (logEl.children.length > MAX) {
-                logEl.removeChild(logEl.lastChild)
-              }
-
-              highlightActiveInGroup(boxEl, joyInputId)
-            }
-          } else {
-            const entryText = `${decrypt}\n${binds}`
-            if (!prev || prev.lastText !== entryText) {
-              const next = prev || {}
-              next.lastText = entryText
-              st.inputEventState.set(joyInputId, next)
-
-              const spanId = spanIdFromJoyInput(joyInputId)
-              const span = document.getElementById(spanId)
-              if (span) {
-                span.textContent = entryText
-              }
-
-              const MAX = 10
-              while (logEl.children.length > MAX) {
-                logEl.removeChild(logEl.lastChild)
-              }
-
-              highlightActiveInGroup(boxEl, joyInputId)
-            }
+          } catch (err) {
+            recordUnplaced({ prefix, joyInput: `layout_missing_${prefix}` })
+            ipcRenderer.send('renderer-response-error', serializeError(err), location)
           }
+
+          ipcRenderer.send('initializer-response', `${prefix} joyview initialized...`)
         }
-
-        return
+      } catch (err) {
+        ipcRenderer.send('renderer-response-unhandled-error', serializeError(err), location)
       }
-    }
+    })
 
-    // Fallback: old DOM highlight
-    const node = document.getElementById(package.joyInput)
-    if (!node) {
-      recordUnplaced(package)
-    } else {
-      if (package.prefix) {
-        const prevKey = `__joyview_prev_dom_${package.prefix}`
-        const prevId = window[prevKey]
-        if (prevId && prevId !== package.joyInput) {
-          const prevNode = document.getElementById(prevId)
-          if (prevNode) prevNode.classList.remove('active')
-        }
-        window[prevKey] = package.joyInput
-      }
-      node.classList.add('active')
-    }
-
-  } catch (err) {
-    console.log(err)
-    ipcRenderer.send('renderer-response-error', serializeError(err), location)
-  }
-})
-
-
-
-
-
-
-  ipcRenderer.on('from_brain-detection-initialize', async package => {
-    try {
-      for (const device in package) {
-        const d = package[device]
-        if (!d || !d.prefix) continue
-
-        const prefix = d.prefix
-        const product = d.product || ''
-      try {
-          const res = await requestLayoutForDevice(d.key) // "3344:43F4"
-          buildDeviceView(prefix, product, res.layoutJson, res.imageUrl)
-        } catch (err) {
-          recordUnplaced({ prefix, joyInput: `layout_missing_${prefix}` })
-          ipcRenderer.send('renderer-response-error', serializeError(err), location)
-        }
-        ipcRenderer.send('initializer-response', `${prefix} joyview initialized...`)
-      }
-    } catch (err) {
-      ipcRenderer.send('renderer-response-unhandled-error', serializeError(err), location)
-    }
-  })
-  // ipcRenderer.on('from_brain-detection-initialize', async package => {
-  //   try {
-  //     for (const device in package) {
-  //       const d = package[device]
-  //       if (!d || !d.prefix) continue
-
-  //       const prefix = d.prefix
-  //       const product = d.product || ''
-
-  //       // // headers
-  //       // const posEl = document.getElementById(`${prefix}_position`)
-  //       // if (posEl) posEl.innerText = product
-
-  //       // const header = document.getElementById(`${prefix}displayedBind`)
-  //       // if (header) header.insertAdjacentText('beforeend', product)
-
-  //       // overlays (ONE time per device)
-  //       try {
-  //         const res = await requestLayoutForDevice(d.key) // "3344:43F4"
-  //         buildDeviceView(prefix, product, res.layoutJson, res.imageUrl)
-  //       } catch (err) {
-  //         recordUnplaced({ prefix, joyInput: `layout_missing_${prefix}` })
-  //         ipcRenderer.send('renderer-response-error', serializeError(err), location)
-  //       }
-
-  //       // // rebuild table rows
-  //       // const container = document.getElementById(`${prefix}bar_container`)
-  //       // if (!container) continue
-
-  //       // let dynamicDom = document.getElementsByClassName(`${prefix}_DynamicDom`)
-  //       // dynamicDom = Array.from(dynamicDom)
-  //       // dynamicDom.forEach(dom => dom.remove())
-
-  //       // if (d.buttons != 0) {
-  //       //   for (let btn = 1; btn <= d.buttons; btn++) {
-  //       //     const newTR = document.createElement('tr')
-  //       //     container.appendChild(newTR)
-
-  //       //     newTR.setAttribute('class', `${prefix}_DynamicDom ${prefix}_DynamicDomTR`)
-
-  //       //     const TH1 = document.createElement('th')
-  //       //     newTR.appendChild(TH1)
-  //       //     TH1.setAttribute('class', `${prefix}_DynamicDom font-BLOCKY w3-text-orange`)
-  //       //     TH1.setAttribute('id', `${prefix}_button${btn}_assignment`)
-  //       //     TH1.innerText = ''
-
-  //       //     const TH2 = document.createElement('th')
-  //       //     newTR.appendChild(TH2)
-  //       //     TH2.setAttribute('class', `${prefix}_DynamicDom font-BLOCKY w3-text-orange`)
-  //       //     TH2.setAttribute('id', `${prefix}_button${btn}_slot`)
-  //       //     TH2.innerText = String(btn)
-
-  //       //     const TH3 = document.createElement('th')
-  //       //     newTR.appendChild(TH3)
-  //       //     TH3.setAttribute('class', `${prefix}_DynamicDom font-BLOCKY w3-text-orange`)
-  //       //     TH3.setAttribute('id', `${prefix}_button${btn}_index`)
-  //       //     TH3.innerText = String(btn)
-  //       //   }
-  //       // }
-
-  //       // if (d.axes != 0) {
-  //       //   for (const axis of d.axes) {
-  //       //     const newTR = document.createElement('tr')
-  //       //     container.appendChild(newTR)
-
-  //       //     newTR.setAttribute('class', `${prefix}_DynamicDom ${prefix}_DynamicDomTR`)
-
-  //       //     const TH1 = document.createElement('th')
-  //       //     newTR.appendChild(TH1)
-  //       //     TH1.setAttribute('class', `${prefix}_DynamicDom font-BLOCKY w3-text-orange`)
-  //       //     TH1.setAttribute('id', `${prefix}_axis_${axis}_assignment`)
-  //       //     TH1.innerText = ''
-
-  //       //     const TH2 = document.createElement('th')
-  //       //     newTR.appendChild(TH2)
-  //       //     TH2.setAttribute('class', `${prefix}_DynamicDom font-BLOCKY w3-text-orange`)
-  //       //     TH2.setAttribute('id', `${prefix}_axis_${axis}_slot`)
-  //       //     TH2.innerText = `${prefix}_axis_${axis}`
-
-  //       //     const TH3 = document.createElement('th')
-  //       //     newTR.appendChild(TH3)
-  //       //     TH3.setAttribute('class', `${prefix}_DynamicDom font-BLOCKY w3-text-orange`)
-  //       //     TH3.setAttribute('id', `${prefix}_axis_${axis}_index`)
-  //       //     TH3.innerText = `${prefix}_axis_${axis}`
-  //       //   }
-  //       // }
-
-  //       ipcRenderer.send('initializer-response', `${prefix} joyview initialized...`)
-  //     }
-  //   } catch (err) {
-  //     ipcRenderer.send('renderer-response-unhandled-error', serializeError(err), location)
-  //   }
-  // })
 } catch (err) {
   console.log('MAIN', err)
   if (window.ipcRenderer) window.ipcRenderer.send('renderer-response-unhandled-error', serializeError(err), location)

@@ -21,11 +21,52 @@
   transition: 120ms;
 }
 .joy_spot.hover { fill: rgba(255,255,255,0.14); }
-.joy_spot.active { 
-  fill: rgba(0, 0, 0, 1); 
-  stroke: rgba(0,255,0,0.75); 
+.joy_spot.active {
+  fill: rgba(0, 0, 0, 1);
+  stroke: rgba(0,255,0,0.75);
 }
 
+/* ✅ labels render above spots */
+.joy_spot_text_layer {
+  pointer-events: none;
+}
+
+/* ✅ spot label text that sits on top of each spot */
+.joy_spot_label {
+  font-family: monospace;
+  font-size: 20px;
+  font-weight: 700;
+  fill: rgba(255,255,255,0.75);
+  pointer-events: none;
+  user-select: none;
+
+  /* makes white text readable on any fill */
+  paint-order: stroke;
+  stroke: rgba(0,0,0,0.75);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.joy_spot_label.active {
+  fill: rgba(0,255,0,0.95);
+  stroke: rgba(0,0,0,0.85);
+}
+
+.joy_spot_label.hover {
+  fill: rgba(255,255,255,0.95);
+}
+/* background behind the label, auto-sized */
+.joy_spot_label_bg {
+  fill: rgba(0,0,0,0.85);
+  stroke: rgba(255,255,255,0.20);
+  stroke-width: 1;
+  rx: 6;
+  ry: 6;
+  pointer-events: none;
+}
+.joy_spot_label_bg.active {
+  stroke: rgba(0,255,0,0.75);
+}
 /* group overlay boxes (one per group) */
 .joy_group_overlays {
   display: flex;
@@ -38,9 +79,25 @@
   padding: 8px 10px;
   border-radius: 8px;
   white-space: pre-line;
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.3;
+}
+.joygroupbox {
+  /* global box styling */
+}
+.joygroupbox-title {
+  display: block;
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.2;
+  margin-bottom: 6px;
+  color: rgba(255,255,255,0.75);
+  white-space: normal;
 }
 .joy_group_box.hover { border-color: rgba(255,255,255,0.55); }
 .joy_group_box.active { border-color: rgba(0,255,0,0.85); }
+
 .joy_views {
   display: flex;
   flex-direction: column;
@@ -53,5 +110,14 @@
   flex-direction: column;
   gap: 4px;
 }
-.bind_entry { white-space: pre-line; }
-.bind_active { color: #00ff66; } /* green */
+
+/* ✅ binds are orange by default */
+.bind_entry {
+  white-space: pre-line;
+  color: #ff9800;
+}
+
+/* ✅ active bind always green */
+.bind_entry.bind_active {
+  color: #00ff66 !important;
+}
