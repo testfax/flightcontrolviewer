@@ -17,7 +17,7 @@ try {
         userID: commander.FID,
         // logs: updatePreviousMaxLines()
     }
-    const secretKey = 'somefatcat'
+    const secretKey = 'xxxxxxxxxxxx'
     const token = jwt.sign(payload, secretKey)
     // if (watcherConsoleDisplay("globalLogs")) { logs("[SOCKET CLIENT]".blue," STATUS:"," OPERATIONAL ".green) }
     const manager = new Manager('https://elitepilotslounge.com/socket.io/', {
