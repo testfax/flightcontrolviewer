@@ -134,7 +134,7 @@ function main() {
       try {
         // Create a loading screen window
         win = new BrowserWindow({
-          width: !isNotDev ? 1000 : 500,
+          width: !isNotDev ? 600 : 600,
           height: 800,
           webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
