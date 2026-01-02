@@ -10,3 +10,11 @@ Reads Star Citizen Keybinds (actionmaps.xml) and transposes them into your joyst
 
 # More Devices...
 - Other devices will be available once I get some assistance from other device owners.
+
+# Current Version 1
+- Has an error reporting feature that will directly send me any errors and logs.
+- Using this software implicitly agrees with those until I push to version 2, where that will be disabled.
+
+# Automatic Updates
+- Automatic updates are enabled.
+- Currently untested in 1.0.0, however base code works flawlessly in other projects so I assume it works here.
