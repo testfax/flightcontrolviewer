@@ -128,3 +128,12 @@
 .bind_entry.bind_active {
   color: #00ff66 !important;
 }
+.joygroupbox-mainTitle {
+  display: block;
+  font-family: monospace;
+  font-size: 40px;
+  line-height: 1.2;
+  margin-bottom: 6px;
+  color: rgba(255,255,255,0.75);
+  white-space: normal;
+}

@@ -1,4 +1,6 @@
 try {
+  let devMode
+
   const location = 'joyview'
   const ipcRenderer = window.ipcRenderer
 
@@ -19,31 +21,25 @@ try {
   function getCanvasHostForPrefix(prefix) {
     return document.getElementById(`${prefix}_device_canvas`)
   }
-
   function getGroupHostForPrefix(prefix) {
     return document.getElementById(`${prefix}_group_overlays`)
   }
-
   function hideEl(el) {
     if (!el) return
     el.classList.add('is-hidden')
   }
-
   function showEl(el) {
     if (!el) return
     el.classList.remove('is-hidden')
   }
-
   function hideDeviceUI(prefix) {
     hideEl(getCanvasHostForPrefix(prefix))
     hideEl(getGroupHostForPrefix(prefix))
   }
-
   function showDeviceUI(prefix) {
     showEl(getCanvasHostForPrefix(prefix))
     showEl(getGroupHostForPrefix(prefix))
   }
-
   function showOnlyDeviceUI(activePrefix) {
     // hide/show based on known states (most reliable)
     if (layoutState && layoutState.byPrefix && typeof layoutState.byPrefix.forEach === 'function') {
@@ -63,7 +59,6 @@ try {
       else hideEl(el)
     })
   }
-
   function hideAllGroupBoxesForState(state) {
     if (!state) return
 
@@ -80,15 +75,12 @@ try {
       })
     }
   }
-
   // ============================================================
   // WINDOW LOADED / UI CLICK STUFF (unchanged)
   // ============================================================
-
   const windowLoaded = new Promise(resolve => {
     window.onload = resolve
   })
-
   windowLoaded.then(() => {
     // FUNCTIONS FROM MOUSEOVER
     const pointer = document.getElementsByClassName('pointer')
@@ -110,7 +102,6 @@ try {
       })
     })
   })
-
   window.addEventListener('click', clickedEvent)
   async function clickedEvent(evt) {
     const clickedEventArr = [evt.target.getAttribute('id')] // id="guardian_moduleblueprint_checkbox"
@@ -175,22 +166,18 @@ try {
       drop(clickedEventArr[0], 'joyview') // review function for HTML class requirements.
     }
   }
-
   // ============================================================
   // UNPLACED TRACKING (unchanged)
   // ============================================================
-
   const unplacedState = {
     byPrefix: {} // js2 -> Map(joyInput -> { count, lastSeen })
   }
-
   function getUnplacedMap(prefix) {
     if (!unplacedState.byPrefix[prefix]) {
       unplacedState.byPrefix[prefix] = new Map()
     }
     return unplacedState.byPrefix[prefix]
   }
-
   function recordUnplaced(package) {
     const prefix = package.prefix || 'unknown'
     const joyInput = package.joyInput || 'unknown'
@@ -204,7 +191,6 @@ try {
 
     renderUnplaced()
   }
-
   function renderUnplaced() {
     const box = document.getElementById('joyview_unplaced')
     if (!box) return
@@ -230,7 +216,6 @@ try {
 
     box.innerText = lines.join('\n').trim()
   }
-
   function serializeError(e) {
     if (!e) return { name: 'Error', message: 'Unknown error', stack: '' }
 
@@ -245,11 +230,9 @@ try {
       cause: e.cause ? serializeError(e.cause) : undefined
     }
   }
-
   // ============================================================
   // LAYOUT STATE / LAYOUT FETCH (unchanged)
   // ============================================================
-
   const layoutState = {
     // prefix -> {
     //   layout,
@@ -261,35 +244,29 @@ try {
     // }
     byPrefix: new Map()
   }
-
   function vidPidKeyFromNums(vendorId, productId) {
     // your layout index uses uppercase hex like 3344:43F4
     const vid = Number(vendorId).toString(16).toUpperCase().padStart(4, '0')
     const pid = Number(productId).toString(16).toUpperCase().padStart(4, '0')
     return `${vid}:${pid}`
   }
-
   function normalizeJoyInput(prefix, joyInput) {
     // package.joyInput is already like ${prefix}_button1 or ${prefix}_axis_rx
     return joyInput
   }
-
   async function requestLayoutForDevice(vidPidKey) {
     const res = await ipcRenderer.invoke('joyview:get-layout', { vidPidKey })
     if (!res || res.ok !== 1) throw new Error((res && res.error) ? res.error : `No layout for ${vidPidKey}`)
     return res
   }
-
   async function getLayoutForKey(vidPidKey) {
     const res = await ipcRenderer.invoke('joyview:get-layout', { vidPidKey })
     if (!res || res.ok !== 1) throw new Error((res && res.error) ? res.error : `No layout for ${vidPidKey}`)
     return res
   }
-
   // ============================================================
   // BUILD DEVICE VIEW (unchanged except: nothing about product title)
   // ============================================================
-
   function buildDeviceView(prefix, product, layoutJson, imageUrl) {
     const canvasHost = document.getElementById(`${prefix}_device_canvas`)
     const groupHost = document.getElementById(`${prefix}_group_overlays`)
@@ -445,11 +422,9 @@ try {
       svgRoot: svg
     })
   }
-
   // ============================================================
   // DETECTION HANDLER (CHANGES: hide/show canvases AND boxes correctly)
   // ============================================================
-
   ipcRenderer.on('from_brain-detection', async package => {
     try {
       const st = layoutState.byPrefix.get(package.prefix)
@@ -458,9 +433,12 @@ try {
       if (st) {
         // ensure prefix is stored on state
         if (!st.prefix) st.prefix = package.prefix
-
+        const thisDeviceEl = document.getElementById('thisDevice')
+        if (thisDeviceEl) {
+          thisDeviceEl.innerText = package.product
+        }
         // ✅ on any input: show only this device (canvas + group host), hide all others
-        showOnlyDeviceUI(package.prefix)
+        if (devMode != 1) showOnlyDeviceUI(package.prefix)
 
         // ✅ on any input: hide ALL group boxes for other devices (prevents leftovers)
         layoutState.byPrefix.forEach((otherSt, otherPrefix) => {
@@ -602,13 +580,14 @@ try {
           t.__bg = bg
 
           const bb = spotEl.getBBox()
-          const cx = bb.x + bb.width / 2
-          const cy = bb.y + bb.height / 2
-          t.__spotCx = cx
-          t.__spotCy = cy
 
-          t.setAttribute('x', String(cx))
-          t.setAttribute('y', String(cy))
+          // store the spot's upper-left as our anchor
+          t.__spotX = bb.x
+          t.__spotY = bb.y
+
+          // initial position (will be finalized in setSpotLabel)
+          t.setAttribute('x', String(bb.x))
+          t.setAttribute('y', String(bb.y))
 
           st.spotTextEls.set(joyInputId, t)
           st.spotTextEls.set(spotId, t)
@@ -655,14 +634,16 @@ try {
           const padX = 8
           const padY = 5
 
-          const cx = (typeof t.__spotCx === 'number') ? t.__spotCx : (textBox.x + textBox.width / 2)
-          const cy = (typeof t.__spotCy === 'number') ? t.__spotCy : (textBox.y + textBox.height / 2)
+          // anchor at the spot's upper-left
+          const ax = (typeof t.__spotX === 'number') ? t.__spotX : textBox.x
+          const ay = (typeof t.__spotY === 'number') ? t.__spotY : textBox.y
 
           const bgW = textBox.width + padX * 2
           const bgH = textBox.height + padY * 2
 
-          const bgX = cx - bgW / 2
-          const bgY = cy - bgH / 2
+          // bg top-left = anchor
+          const bgX = ax
+          const bgY = ay
 
           const bg = t.__bg
           if (bg) {
@@ -672,9 +653,13 @@ try {
             bg.setAttribute('height', String(bgH))
           }
 
+          // text sits inside bg with padding.
+          // NOTE: y is the text baseline (dominant-baseline: middle), so use the textBox height.
           const textX = bgX + padX
+          const textY = bgY + padY + (textBox.height / 2)
+
           t.setAttribute('x', String(textX))
-          t.setAttribute('y', String(cy))
+          t.setAttribute('y', String(textY))
 
           const tspans = t.querySelectorAll('tspan')
           tspans.forEach(span => span.setAttribute('x', String(textX)))
@@ -785,7 +770,7 @@ try {
           set.clear()
         }
 
-        hideAllSpotsOnce(st, svgRoot)
+        if (devMode != 1) hideAllSpotsOnce(st, svgRoot)
 
         function inputKindFromJoyInput(joyInput) {
           const s = String(joyInput || '')
@@ -1007,12 +992,12 @@ try {
 
           // If group changed, hide ALL spots that were shown for the previous group
           if (st.visibleGroupId && gid && st.visibleGroupId !== gid) {
-            hideAllSpotsForGroup(st, svgRoot, st.visibleGroupId)
+            if (devMode != 1) hideAllSpotsForGroup(st, svgRoot, st.visibleGroupId)
           }
 
           // Hide previously visible single spot (spot + text + bg)
           if (st.visibleSpotId && st.visibleSpotId !== spotId) {
-            hideSpotById(st, svgRoot, st.visibleSpotId)
+            if (devMode != 1) hideSpotById(st, svgRoot, st.visibleSpotId)
           }
 
           // Track this spot as visible for this group (so we can nuke the whole group's shown spots on switch)
@@ -1026,19 +1011,19 @@ try {
           }
 
           // Show current spot
-          setSpotVisible(spotEl, true)
+          if (devMode != 1) setSpotVisible(spotEl, true)
 
           // Ensure label exists, SHOW it (text+bg), then set label
           const t = ensureTextForSpot(st, svgRoot, joyInputId)
-          setTextVisible(t, true)
+          if (devMode != 1) setTextVisible(t, true)
 
-          setSpotLabel(st, svgRoot, joyInputId, decrypt, binds)
-          highlightSpotLabel(st, svgRoot, joyInputId)
+          if (devMode != 1) setSpotLabel(st, svgRoot, joyInputId, decrypt, binds)
+          if (devMode != 1) highlightSpotLabel(st, svgRoot, joyInputId)
 
           st.visibleSpotId = spotId
 
           // ✅ HARD ENFORCE: hide ALL group boxes for this device, then show only the active one
-          hideAllGroupBoxesForState(st)
+          if (devMode != 1) hideAllGroupBoxesForState(st)
 
           if (gid && boxEl) {
             boxEl.classList.remove('is-hidden')
@@ -1084,11 +1069,11 @@ try {
 
             const btnNumForId = (kind === 'button') ? buttonNumberFromJoyInput(joyInputId) : null
 
-            ensureSpanForJoyInput(btnEl, axisEl, joyInputId, kind, btnNumForId)
+            if (devMode != 1) ensureSpanForJoyInput(btnEl, axisEl, joyInputId, kind, btnNumForId)
 
             if (kind === 'button') resortButtons(btnEl)
 
-            highlightActiveGlobal(st, joyInputId)
+            if (devMode != 1) highlightActiveGlobal(st, joyInputId)
 
             if (kind === 'button') {
               const pressed = readPressed(package)
@@ -1118,11 +1103,11 @@ try {
                 const span = document.getElementById(spanId)
                 if (span) span.textContent = `${decrypt}\n${binds}`
 
-                resortButtons(btnEl)
-                highlightActiveGlobal(st, joyInputId)
+                if (devMode != 1) resortButtons(btnEl)
+                if (devMode != 1) highlightActiveGlobal(st, joyInputId)
 
-                setSpotLabel(st, svgRoot, joyInputId, decrypt, binds)
-                highlightSpotLabel(st, svgRoot, joyInputId)
+                if (devMode != 1) setSpotLabel(st, svgRoot, joyInputId, decrypt, binds)
+                if (devMode != 1) highlightSpotLabel(st, svgRoot, joyInputId)
               }
             } else if (kind === 'axis') {
               const val = readNumericValue(package)
@@ -1176,10 +1161,10 @@ try {
                 const MAX = 10
                 while (axisEl.children.length > MAX) axisEl.removeChild(axisEl.lastChild)
 
-                highlightActiveGlobal(st, joyInputId)
+                if (devMode != 1) highlightActiveGlobal(st, joyInputId)
 
-                setSpotLabel(st, svgRoot, joyInputId, decrypt, binds)
-                highlightSpotLabel(st, svgRoot, joyInputId)
+                if (devMode != 1) setSpotLabel(st, svgRoot, joyInputId, decrypt, binds)
+                if (devMode != 1) highlightSpotLabel(st, svgRoot, joyInputId)
               }
             } else {
               const entryText = `${decrypt}\n${binds}`
@@ -1195,9 +1180,9 @@ try {
                 const MAX = 10
                 while (axisEl.children.length > MAX) axisEl.removeChild(axisEl.lastChild)
 
-                highlightActiveGlobal(st, joyInputId)
+                if (devMode != 1) highlightActiveGlobal(st, joyInputId)
 
-                setSpotLabel(st, svgRoot, joyInputId, decrypt, binds)
+                if (devMode != 1) setSpotLabel(st, svgRoot, joyInputId, decrypt, binds)
                 highlightSpotLabel(st, svgRoot, joyInputId)
               }
             }
@@ -1228,12 +1213,9 @@ try {
       ipcRenderer.send('renderer-response-error', serializeError(err), location)
     }
   })
-
-  // ============================================================
-  // INITIALIZE HANDLER (CHANGES: hide BOTH canvas + group host via class)
-  // ============================================================
-
   ipcRenderer.on('from_brain-detection-initialize', async package => {
+    devMode = package.devMode
+    console.log("MODE:", devMode)
     try {
       for (const device in package) {
         const d = package[device]
@@ -1257,16 +1239,17 @@ try {
           })
 
           // ✅ hide the entire device UI (canvas + overlays) so it doesn't reserve space
-          hideDeviceUI(prefix)
+          if (devMode != 1) hideDeviceUI(prefix) 
 
           // HIDE JOYSPOTS AFTER INIT (for this device/prefix)
           const st = layoutState.byPrefix.get(prefix)
+          
           if (st) {
             if (!st.prefix) st.prefix = prefix
 
             if (st.spotEls && typeof st.spotEls.forEach === 'function') {
               st.spotEls.forEach(el => {
-                if (el) el.style.display = 'none'
+                if (devMode != 1) if (el) el.style.display = 'none'
               })
             } else {
               const root =
@@ -1277,7 +1260,7 @@ try {
 
               if (root) {
                 root.querySelectorAll('.joy_spot').forEach(el => {
-                  el.style.display = 'none'
+                  if (devMode != 1) el.style.display = 'none'
                 })
               }
             }

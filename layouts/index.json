@@ -1,8 +1,9 @@
 {
   "schema": 1,
   "devices": {
+    "3344:43F4": "right-virpil-constellation-alpha-prime.json",
     "3344:03F3": "left-virpil-constellation-alpha-prime.json",
     "3344:01F9": "vpc-ace-torq-rudder.json",
-    "3344:43F4": "right-virpil-constellation-alpha-prime.json"
+    "1234:BEAD": "vjoy.json"
   }
 }

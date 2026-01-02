@@ -1,3 +1,8 @@
+const devMode = { devMode: 0 }
+
+
+
+
 const { logs_warn, logs, logs_error, logs_debug } = require('../utils/logConfig')
 const HID = require('node-hid')
 const { blastToUI } = require('../brain/input-functions')
@@ -675,6 +680,7 @@ function startInputLoggerForDevice(d, parsed) {
 
   device.on('error', (err) => {
     logs_error(err)
+    console.log(err)
     setTimeout(() => {
       console.log('[BRAIN]'.bgCyan, 'RESTARTING AFTER DEVICE LOST'.red)
       app.relaunch()
@@ -769,7 +775,7 @@ function correctControls() {
 function joySubmit(data) {
   if (showConsoleMessages) { console.log(data) }
   let package = {}
-  package = { 
+  package = {
     ...data, 
     ...{receiver: "from_brain-detection"},
   }
@@ -872,8 +878,9 @@ function initializeUI(data, receiver) {
     let sortedPackage = Object.values(package)
       .sort((a, b) => a.position - b.position)
     sortedPackage['receiver'] = receiver
+    sortedPackage = { ...sortedPackage, ...devMode }
 
-    // console.log(sortedPackage)
+    // console.log("SortedPackage",sortedPackage)
 
     blastToUI(sortedPackage)
     logs_warn(sortedPackage)
@@ -889,6 +896,7 @@ setTimeout(() => {
     init = 0
     logs('=== Ready to Receive Inputs ==='.green)
 }, 2000)
+
 main()
 //#############################
 
@@ -979,3 +987,4 @@ ipcMain.on('renderer-response-error', (event,message,location) => {
 ipcMain.on('renderer-response-unhandled-error', (event,message,location) => {
     logs_error("[RENDERER-UNHANDLED-ERROR]".bgRed,message,location)
 })
+
