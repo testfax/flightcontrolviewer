@@ -585,7 +585,6 @@ function startInputLoggerForDevice(d, parsed) {
 
         const out = `${prefix}button${b.usage}`
         if (reportOnce(out)) {
-          console.log(out.blue)
           if (showConsoleMessages) console.log(out.blue)
           gatherAfterDeviceInputs(out, d)
         }
@@ -654,13 +653,11 @@ function startInputLoggerForDevice(d, parsed) {
       if (init == 0 && !buttonCooldownActive) {
         if (!wasActive && isActive) {
           if (reportOnce(out)) {
-            console.log(out.cyan)
             if (showConsoleMessages) console.log(out.cyan)
           }
           axisLastEmit.set(out, now)
         } else if (movedEnough && (now - lastEmit) >= AXIS_COOLDOWN_MS) {
           if (reportOnce(out)) {
-            console.log(out.red)
             if (showConsoleMessages) console.log(out.red)
             gatherAfterDeviceInputs(out, d)
           }
@@ -894,6 +891,9 @@ function resolveLayoutsDir(app, path) {
 let init = 1
 setTimeout(() => {
     init = 0
+    const package = { receiver: "from_brain-detection-ready", data: 1 }
+    blastToUI(package)
+
     logs('=== Ready to Receive Inputs ==='.green)
 }, 2000)
 
@@ -987,4 +987,3 @@ ipcMain.on('renderer-response-error', (event,message,location) => {
 ipcMain.on('renderer-response-unhandled-error', (event,message,location) => {
     logs_error("[RENDERER-UNHANDLED-ERROR]".bgRed,message,location)
 })
-

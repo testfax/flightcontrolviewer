@@ -52,21 +52,6 @@ const template = [
     //     ]
     // },
     {
-        label: 'Dashboard',
-        // click: ()=>{links.statistics();} 
-        click: ()=>{links.dashboard()}
-        // submenu: [
-        //     {
-        //         label: 'Sampling',
-        //         click: ()=>{links.sampling()}
-        //     },
-        //     // {
-        //     //     label: 'Test',
-        //     //     click: ()=>{links.test()}
-        //     // }
-        // ]
-    },
-    {
         label: 'Joystick Viewer',
         // click: ()=>{links.statistics();} 
         click: ()=>{links.joyview()}

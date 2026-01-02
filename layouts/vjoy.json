@@ -1,8 +1,8 @@
 {
   "schema": 2,
   "device": {
-    "grip": "VPC Constellation ALPHA Prime",
-    "hand": "L",
+    "grip": "VJOY",
+    "hand": "1",
     "product": "VJOY",
     "vid": "0",
     "pid": "0"

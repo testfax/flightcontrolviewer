@@ -1,12 +1,57 @@
 .is-hidden {
   display: none !important;
 }
+html, body {
+  scrollbar-width: thin;                 /* Firefox (harmless in Electron) */
+  scrollbar-color: #666 #2b2b2b;
+}
+
+/* Chromium / Electron */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track,
+*::-webkit-scrollbar-track {
+  background: #2b2b2b;                   /* gray sides (track) */
+}
+
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-thumb {
+  background: #666;                       /* thumb */
+  border-radius: 8px;
+  border: 3px solid #2b2b2b;              /* makes “sides” look wider */
+}
+
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover,
+*::-webkit-scrollbar-thumb:hover {
+  background: #7a7a7a;
+}
+html {
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+
+  /* fake a subtle gutter on the right */
+  background:
+    linear-gradient(to left, rgba(255,255,255,0.08), rgba(255,255,255,0)) right / 16px 100% no-repeat,
+    rgb(18,18,18);
+}
 /* host that will contain 2 stacked view canvases (side/back) */
 .joy_device_canvas {
   width: 420px;
   max-width: 100%;
 }
-
+[id$="_device_canvas"] .joy_svg {
+  display: block;
+  border: 1px solid rgba(255, 255, 255, 0.781);
+  border-radius: 8px;
+}
 /* each SVG scales to container */
 .joy_svg {
   width: 100%;
@@ -101,7 +146,7 @@
   white-space: normal;
 }
 .joy_group_box.hover { border-color: rgba(255,255,255,0.55); }
-.joy_group_box.active { border-color: rgba(0,255,0,0.85); }
+.joy_group_box.active { border-color: rgba(255, 255, 255, 0.781); }
 
 .joy_views {
   display: flex;
@@ -134,6 +179,6 @@
   font-size: 40px;
   line-height: 1.2;
   margin-bottom: 6px;
-  color: rgba(255,255,255,0.75);
+  color: rgba(2, 255, 23, 0.75);
   white-space: normal;
 }

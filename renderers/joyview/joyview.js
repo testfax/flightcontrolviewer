@@ -425,6 +425,12 @@ try {
   // ============================================================
   // DETECTION HANDLER (CHANGES: hide/show canvases AND boxes correctly)
   // ============================================================
+  ipcRenderer.on('from_brain-detection-ready', async package => {
+    const thisDeviceEl = document.getElementById('thisDevice')
+        if (thisDeviceEl) {
+          thisDeviceEl.innerText = "Move a Device to Begin...."
+        }
+  })
   ipcRenderer.on('from_brain-detection', async package => {
     try {
       const st = layoutState.byPrefix.get(package.prefix)
