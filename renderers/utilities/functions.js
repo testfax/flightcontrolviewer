@@ -77,16 +77,12 @@ async function drop(clickedEvent,other) {
         let container = document.getElementById(`${clickedEvent}_container`)
         let identify = clickedEvent.split("_")
         let arrow = null;
-        // let ModclickedEvent = null
-        let fromStore = null; 
+
         if (other && identify[1] == 'em') { 
-          // ModclickedEvent = clickedEvent.split("_")
-          // clickedEvent = ModclickedEvent[0]
-          fromStore = await getEventFromStore(other);
+
         }
         
         arrow = document.getElementById(`${clickedEvent}_arrow`)
-        
         if (container.classList.contains("w3-hide")) {
           container.classList.remove('w3-hide');
           arrow.innerText = "arrow_drop_down";
@@ -97,49 +93,7 @@ async function drop(clickedEvent,other) {
           arrow.innerText = "arrow_drop_up";
           state = 0
         }
-        if (identify[1] == 'em') {
-            Object.values(fromStore).forEach((value) => {
-              if (Array.isArray(value)) {
-                value.forEach((material) => {
-                  if (material.Group === identify[0]) {
-                    material.State = state;
-                    
-                  }
-                });
-              }
-            });
-            window.electronStoreMaterials.set('Materials','data',fromStore)
-            const FET = {
-              type: 'Materials',
-              method: "POST",
-              filePath: ["./events/Appendix/materials.json"],
-              category: identify[0],
-              state: state
-            }
-            
-            fetcher(FET);
-        }
-      }
-      if (box.classList.contains('descriptorText') && clickedEvent[0] != null) { 
-        // let ModclickedEvent = null
-        let fromStore = null; 
-        if (other) {
-          fromStore = getEventFromStore(other);
-          Object.values(fromStore).forEach((value) => {
-            if (Array.isArray(value)) {
-              value.forEach((material) => {
-                if (material.Name === clickedEvent) {
-                  // console.log(material.description)
-                  document.getElementById('descriptionText').innerText = material.description
-                }
-              });
-            }
-          });
-          
-        }
-        else {
-          console.log("NOHTING FROM STORE")
-        }
+        
       }
     }
     return state

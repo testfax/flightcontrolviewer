@@ -2,7 +2,7 @@
 const { logs, logs_error, logs_debug } = require('../utils/logConfig')
 try {
     const { convertXML,client_path } = require('../utils/utilities')
-    const Store = require('electron-store');
+    const Store = require('electron-store').default
     const actionmaps = new Store({ name: 'actionmapsJSON'})
     actionmaps.delete('discoveredKeybinds')
     actionmaps.delete('actionmaps')
@@ -29,6 +29,7 @@ try {
             })
         })
         evaluateActionmaps()
+        
         async function evaluateActionmaps() {
             const stat = await convertXML(client_path().rsi_actionmaps)
             if (stat == true) {

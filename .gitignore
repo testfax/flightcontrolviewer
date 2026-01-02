@@ -3,3 +3,4 @@
 /.vscode
 /temp
 /electronmon.config.js
+*code-workspace

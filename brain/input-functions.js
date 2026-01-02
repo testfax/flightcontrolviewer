@@ -2,7 +2,7 @@ try {
     const {watcherConsoleDisplay,pageData} = require('../utils/utilities')
     const { app,ipcMain, BrowserWindow,webContents  } = require('electron');
     const {logs,logs_error} = require('../utils/logConfig')
-    const Store = require('electron-store');
+    const Store = require('electron-store').default
     const store = new Store({ name: 'electronWindowIds'})
     const thisWindow = store.get('electronWindowIds')
     const client = BrowserWindow.fromId(thisWindow.win);

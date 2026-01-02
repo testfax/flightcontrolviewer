@@ -1,0 +1,90 @@
+{
+  "schema": 2,
+  "device": {
+    "grip": "VJOY",
+    "hand": "1",
+    "product": "VJOY",
+    "vid": "0",
+    "pid": "0"
+  },
+  "overlays": {
+    "main": {
+      "image": "left-virpil-constellation-alpha-prime.png",
+      "sheet": { "w": 1170, "h": 1000 },
+      "viewBox": "0 0 1170 1000"
+    }
+  },
+  "groups": {
+    "g_flip_trigger": { "label": "Dual-Position Flip Trigger", "inputs": ["button_1", "button_2"] },
+    "g_dualstage_trigger": { "label": "Dual Stage Trigger", "inputs":  ["button_3","button_4","button_5"]},
+    "g_rot_button": { "label": "Rotation Button", "inputs":  ["button_6"]},
+    "g_7":  { "label": "Button 7", "inputs": ["button_7"] },
+    "g_hat_a": { "label": "Hat / Cluster A", "inputs": ["button_8","button_9","button_10","button_11","button_12"] },
+    "g_13": { "label": "Button 13", "inputs": ["button_13"] },
+    "g_hat_b": { "label": "Hat / Cluster B", "inputs": ["button_14", "button_15", "button_16", "button_17", "button_18"] },
+    "g_scroller": { "label": "Scroll Wheel", "inputs": ["button_19", "button_20", "button_21", "button_22"] },
+    "g_base": { "label": "Base / Cluster C", "inputs": ["button_23", "button_24", "button_25", "button_26", "button_27"] },
+    "g_topthreeway": { "label": "Top / Three Way", "inputs": ["button_28", "button_29", "button_30"] },
+    "g_pinky": { "label": "Pinky Button", "inputs": ["button_31"] },
+    "g_sliderButton": { "label": "Slider Button", "inputs": ["button_32"] },
+    "g_axes": { "label": "Axes", "inputs": ["axis_rotx", "axis_roty", "axis_slider", "axis_x", "axis_y", "axis_z"] }
+  },
+  "buttons": {
+    "count": 36,
+    "spots": {
+      "button_1": { "shape": "rect", "x": 650, "y": 450, "w": 40.95, "h": 70, "rx": 10 },
+      "button_2": { "shape": "rect", "x": 650, "y": 450, "w": 40.95, "h": 70, "rx": 10 },
+      "button_3": { "shape": "rect", "x": 650, "y": 450, "w": 40.95, "h": 70, "rx": 10 },
+      "button_4": { "shape": "rect", "x": 710, "y": 412, "w": 35.1, "h": 45, "rx": 8 },
+      "button_5": { "shape": "rect", "x": 710, "y": 412, "w": 35.1, "h": 45, "rx": 8 },
+      "button_6": { "shape": "rect", "x": 435, "y": 239, "w": 23.4, "h": 40, "rx": 6 },
+      "button_7": { "shape": "circle", "cx": 338, "cy": 195, "r": 20 },
+      "button_8": { "shape": "rect", "x": 240, "y": 183, "w": 20, "h": 20, "rx": 6 },
+      "button_9": { "shape": "rect", "x": 240, "y": 183, "w": 20, "h": 20, "rx": 6 },
+      "button_10": { "shape": "rect", "x": 240, "y": 183, "w": 20, "h": 20, "rx": 6 },
+      "button_11": { "shape": "rect", "x": 240, "y": 183, "w": 20, "h": 20, "rx": 6 },
+      "button_12": { "shape": "rect", "x": 240, "y": 183, "w": 20, "h": 20, "rx": 6 },
+      "button_13": { "shape": "circle", "cx": 255, "cy": 268, "r": 20 },
+      "button_14": { "shape": "rect", "x": 325, "y": 255, "w": 35.1, "h": 35, "rx": 8 },
+      "button_15": { "shape": "rect", "x": 325, "y": 255, "w": 35.1, "h": 35, "rx": 8 },
+      "button_16": { "shape": "rect", "x": 325, "y": 255, "w": 35.1, "h": 35, "rx": 8 },
+      "button_17": { "shape": "rect", "x": 325, "y": 255, "w": 35.1, "h": 35, "rx": 8 },
+      "button_18": { "shape": "rect", "x": 325, "y": 255, "w": 35.1, "h": 35, "rx": 8 },
+
+      "button_19": { "shape": "rect", "x": 275, "y": 310, "w": 35.1, "h": 35, "rx": 8 },
+      "button_20": { "shape": "rect", "x": 275, "y": 310, "w": 35.1, "h": 35, "rx": 8 },
+      "button_21": { "shape": "rect", "x": 275, "y": 310, "w": 35.1, "h": 35, "rx": 8 },
+      "button_22": { "shape": "rect", "x": 275, "y": 310, "w": 35.1, "h": 35, "rx": 8 },
+
+      "button_23": { "shape": "rect", "x": 400, "y": 400, "w": 30, "h": 30, "rx": 8 },
+      "button_24": { "shape": "rect", "x": 400, "y": 400, "w": 30, "h": 30, "rx": 8 },
+      "button_25": { "shape": "rect", "x": 400, "y": 400, "w": 30, "h": 30, "rx": 8 },
+      "button_26": { "shape": "rect", "x": 400, "y": 400, "w": 30, "h": 30, "rx": 8 },
+      "button_27": { "shape": "rect", "x": 400, "y": 400, "w": 30, "h": 30, "rx": 8 },
+
+      "button_28": { "shape": "rect", "x": 620, "y": 290, "w": 23.4, "h": 40, "rx": 6 },
+      "button_29": { "shape": "rect", "x": 620, "y": 290, "w": 23.4, "h": 40, "rx": 6 },
+      "button_30": { "shape": "rect", "x": 620, "y": 290, "w": 23.4, "h": 40, "rx": 6 },
+
+      "button_31": { "shape": "circle", "cx": 850, "cy": 630, "r": 20 },
+
+      "button_32": { "shape": "rect", "x": 700, "y": 630, "w": 23.4, "h": 40, "rx": 6 },
+
+      "button_33": { "shape": "rect", "x": 435, "y": 239, "w": 23.4, "h": 40, "rx": 6 },
+      "button_34": { "shape": "rect", "x": 435, "y": 239, "w": 23.4, "h": 40, "rx": 6 },
+      "button_35": { "shape": "rect", "x": 435, "y": 239, "w": 23.4, "h": 40, "rx": 6 },
+      "button_36": { "shape": "rect", "x": 435, "y": 239, "w": 23.4, "h": 40, "rx": 6 }
+    }
+  },
+  "axes": {
+    "names": ["rotx", "roty", "slider", "x", "y", "z"],
+    "spots": {
+      "axis_rotx": { "shape": "rect", "x": 435, "y": 239, "w": 128.7, "h": 55, "rx": 8 },
+      "axis_roty": { "shape": "rect", "x": 435, "y": 239, "w": 128.7, "h": 55, "rx": 8 },
+      "axis_slider": { "shape": "rect", "x": 700, "y": 963025, "w": 128.7, "h": 55, "rx": 8 },
+      "axis_x": { "shape": "rect", "x": 250, "y": 750, "w": 128.7, "h": 55, "rx": 8 },
+      "axis_y": { "shape": "rect", "x": 250, "y": 750, "w": 128.7, "h": 55, "rx": 8 },
+      "axis_z": { "shape": "rect", "x": 250, "y": 750, "w": 128.7, "h": 55, "rx": 8 }
+    }
+  }
+}
