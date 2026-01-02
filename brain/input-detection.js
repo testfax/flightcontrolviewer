@@ -893,7 +893,6 @@ setTimeout(() => {
     init = 0
     const package = { receiver: "from_brain-detection-ready", data: 1 }
     blastToUI(package)
-
     logs('=== Ready to Receive Inputs ==='.green)
 }, 2000)
 
