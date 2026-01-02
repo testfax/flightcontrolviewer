@@ -18,3 +18,7 @@ Reads Star Citizen Keybinds (actionmaps.xml) and transposes them into your joyst
 # Automatic Updates
 - Automatic updates are enabled.
 - Currently untested in 1.0.0, however base code works flawlessly in other projects so I assume it works here.
+
+# staticData.json
+- Feel free to fork and if you feel like contributing to the project let me know.
+- If you dont feel like forking or contributing, but want to contribute to the way Star Citizen keybinds are interpreted, review staticData.json and the actionmaps.xml file in your SC folder for comparisons. Send me a DM of a list on Discord.
