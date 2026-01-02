@@ -4,23 +4,27 @@ if (logs) { main(); }
 function main() {
   try {
     const { dialog, nativeTheme, webContents, app, BrowserWindow, ipcMain, Menu } = require('electron')
-    const Store = require('electron-store');
+    const Store = require('electron-store').default
     const path = require('path')
     const fs = require('fs')
-    
+    const { execFileSync } = require('child_process')
+
     const colors = require('colors')
     const { windowPosition, autoUpdater } = require('./utils/utilities')
-    const electronWindowIds = new Store({ name: "electronWindowIds" });
-    electronWindowIds.set('currentPage','dashboard');
+    const electronWindowIds = new Store({ name: "electronWindowIds" })
+    const deviceInfo = new Store({ name: "deviceInfo" })
+    //! RESETS DEVICES TO DETECT NEW DEVICES
+    // deviceInfo.set('devices', {})
+    electronWindowIds.set('currentPage','joyview')
     if (!electronWindowIds.get('theme')) {
       electronWindowIds.set('theme','dark')
     }
     if (!electronWindowIds.get('showConsoleMessages')) {
       electronWindowIds.set('showConsoleMessages',0)
     }
-    electronWindowIds.set('appVersion',app.getVersion());
-    electronWindowIds.set('mainStayOnTop',false);
-    if (app.isPackaged) { electronWindowIds.set('specifyDev',0); }
+    electronWindowIds.set('appVersion',app.getVersion())
+    electronWindowIds.set('mainStayOnTop',false)
+    if (app.isPackaged) { electronWindowIds.set('specifyDev',0) }
     else { electronWindowIds.set('specifyDev',1) }
     if (!electronWindowIds.get('electronWindowIds')) {
       electronWindowIds.set('electronWindowIds',{
@@ -29,54 +33,103 @@ function main() {
       })
     }
 
+    function getWinHidDumpPath() {
+      // DEV: <projectRoot>\helpers\win\win-hid-dump.exe
+      // PACKAGED: <install>\resources\helpers\win\win-hid-dump.exe (extraResources -> process.resourcesPath)
+      const base = app.isPackaged ? process.resourcesPath : process.cwd()
+      return path.join(base, 'helpers', 'winhiddump', 'winhiddump.exe')
+    }
+    function runWinHidDump() {
+      const exePath = getWinHidDumpPath()
+      return execFileSync(exePath, [], { encoding: 'utf8', windowsHide: true })
+    }
     function loadBrains() {
-        // Contains all ipcRenderer event listeners that must perform a PC related action.
-        // Brains Directory: Loop through all files and load them.
-        let brainsDirectory = null;
-        if (app.isPackaged) {
-            brainsDirectory = path.join(process.cwd(),'resources','app','brain')
+      // Contains all ipcRenderer event listeners that must perform a PC related action.
+      // Brains Directory: Loop through all files and load them.
+      let brainsDirectory = null
+
+      if (app.isPackaged) {
+        brainsDirectory = path.join(process.cwd(), 'resources', 'app', 'brain')
+      } else {
+        brainsDirectory = path.join(process.cwd(), 'brain')
+      }
+
+      fs.readdir(brainsDirectory, (err, files) => {
+        if (err) {
+          logs(err)
+          return
         }
-        else {
-            brainsDirectory = path.join(process.cwd(),'brain')
-        }
-        fs.readdir(brainsDirectory, (err, files) => {
+
+        // only .js files
+        const jsFiles = files.filter(file => file.endsWith('.js'))
+
+        jsFiles.forEach((file, index) => {
+          index++
+
+          const filePath = path.join(brainsDirectory, file)
+
+          fs.stat(filePath, (err, stats) => {
             if (err) {
-                logs(err)
-                return;
+              logs(err)
+              return
             }
-            files.forEach((file,index) => {
-                index++
-                const filePath = path.join(brainsDirectory, file);
-                fs.stat(filePath, (err, stats) => {
-                    if (err) {
-                        logs(err)
-                    return;
-                    }
-                    if (stats.isFile()) {
-                        logs('[BRAIN]'.bgCyan,"File:", `${file}`.magenta);
-                        try {  require(filePath) }
-                        catch(e) { console.log(e); }
-                    if (files.length == index) { 
-                        // const loadTime = (Date.now() - appStartTime) / 1000;
-                        // if (watcherConsoleDisplay("globalLogs")) { logs("App-Initialization-Timer".bgMagenta,loadTime,"Seconds") }
-                    }
-                    } else if (stats.isDirectory()) {
-                        logs(`Directory: ${file}`);
-                    }
-                });
-            });
-        });
+
+            if (!stats.isFile()) return
+
+            logs('[BRAIN]'.bgCyan, 'File:', `${file}`.magenta)
+
+            try {
+              require(filePath)
+            } catch (e) {
+              console.log(e)
+            }
+
+            if (jsFiles.length === index) {
+              // const loadTime = (Date.now() - appStartTime) / 1000
+              // if (watcherConsoleDisplay("globalLogs")) {
+              //     logs("App-Initialization-Timer".bgMagenta, loadTime, "Seconds")
+              // }
+            }
+          })
+        })
+      })
     }
 
-    logs("=FLIGHT CONTROL VIEWER= START".green,"isPackaged:".yellow,`${JSON.stringify(app.isPackaged,null,2)}`.cyan, "Version:".yellow,`${JSON.stringify(app.getVersion(),null,2)}`.cyan);
+    logs("=FLIGHT CONTROL VIEWER= START".green,"isPackaged:".yellow,`${JSON.stringify(app.isPackaged,null,2)}`.cyan, "Version:".yellow,`${JSON.stringify(app.getVersion(),null,2)}`.cyan)
     const { mainMenu,rightClickMenu } = require('./menumaker')
     nativeTheme.themeSource = electronWindowIds.get('theme')
-    
+
     const isNotDev = app.isPackaged
     let appStartTime = null
     let win = null
-    
-    app.on('ready', () => { createwin(); })
+    app.commandLine.appendSwitch('disable-logging')
+    app.commandLine.appendSwitch('log-level', '3') 
+    app.on('ready', () => {
+      // Run win-hid-dump automatically before creating window
+      try {
+        const dumpText = runWinHidDump()
+        deviceInfo.set('hidDescriptorDump', dumpText)
+        deviceInfo.set('hidDescriptorDumpStatus', {
+          ok: 1,
+          exePath: getWinHidDumpPath(),
+          length: dumpText.length,
+          time: Date.now()
+        })
+        logs('[HID]'.bgCyan, 'win-hid-dump OK'.green, `len=${dumpText.length}`.magenta)
+      } catch (e) {
+        deviceInfo.set('hidDescriptorDump', '')
+        deviceInfo.set('hidDescriptorDumpStatus', {
+          ok: 0,
+          exePath: getWinHidDumpPath(),
+          err: String(e && e.message ? e.message : e),
+          time: Date.now()
+        })
+        logs_error('[HID] win-hid-dump FAILED'.red, getWinHidDumpPath(), e && e.stack ? e.stack : e)
+      }
+
+      createwin()
+    })
+
     function createwin() {
       try {
         // Create a loading screen window
@@ -95,7 +148,7 @@ function main() {
         win.webContents.on("context-menu", () => {
           rightClickMenu.popup(win.webContents)
         })
-        win.loadFile(path.join(__dirname, './renderers/dashboard/dashboard.html'))
+        win.loadFile(path.join(__dirname, './renderers/joyview/joyview.html'))
 
         win.on("ready-to-show", () => {
           win.setTitle(`Flight Control Viewer - ${app.getVersion()}`)
@@ -104,26 +157,26 @@ function main() {
           win.setSize(windowPositionz.resizeTo[0],windowPositionz.resizeTo[1])
           win.show()
           if (!isNotDev) { win.webContents.openDevTools() }
-          
+
           appStartTime = Date.now()
           loadBrains()
           Menu.setApplicationMenu(mainMenu)
         })
         win.on('resize', () => { windowPosition(win,0) })
-        win.on('moved', () => { windowPosition(win,0); })
+        win.on('moved', () => { windowPosition(win,0) })
 
         let winids = {}
-        let isLoadFinished = false;
+        let isLoadFinished = false
 
         const handleLoadFinish = () => {
           setTimeout(() => {
-              autoUpdater()
-            },5000)
+            autoUpdater()
+          },5000)
 
           if (!isLoadFinished) {
             isLoadFinished = true
             const loadTime = (Date.now() - appStartTime) / 1000
-            logs("App-Initialization-Timer".bgMagenta,`${loadTime} Seconds`.cyan)      
+            logs("App-Initialization-Timer".bgMagenta,`${loadTime} Seconds`.cyan)
             winids['win'] = win.id
             winids['appStatus'] = 'clean'
             electronWindowIds.set('electronWindowIds',winids)
@@ -138,9 +191,9 @@ function main() {
         return
       }
     }
-    
+
     app.on('window-all-closed', () =>{
-      logs("=FLIGHT CONTROL VIEWER= CLOSED".red,"isPackaged:".yellow,`${JSON.stringify(app.isPackaged,null,2)}`.cyan, "Version:".yellow,`${JSON.stringify(app.getVersion(),null,2)}`.cyan);
+      logs("=FLIGHT CONTROL VIEWER= CLOSED".red,"isPackaged:".yellow,`${JSON.stringify(app.isPackaged,null,2)}`.cyan, "Version:".yellow,`${JSON.stringify(app.getVersion(),null,2)}`.cyan)
       // logs(`App Quit`.red)
       if (process.platform !== 'darwin') app.quit()
       return
@@ -150,28 +203,29 @@ function main() {
       //  logs('ReferenceError occurred:'.red, error.stack);
     })
     .on('unhandledRejection', (error, origin) => {
-        logs_error(error,origin)
+      logs_error(error,origin,error.stack)
+      
     })
     .on('TypeError', (error,origin) => {
-        logs_error(error,origin)
-        // logs(error)
+      logs_error(error,origin)
+      // logs(error)
     })
     .on('ReferenceError', (error,origin) => {
       logs_error(error,origin)
-        // logs(error)
+      // logs(error)
     })
     .on('warning', (warning) => {
       logs_error(warning.stack,warning.name)
       // logs('ReferenceError occurred:'.red, warning.stack);
     })
     .on('ERR_INVALID_ARG_TYPE', (error,origin) => {
-        logs_error(error,origin)
-        // logs(error)
+      logs_error(error,origin)
+      // logs(error)
     })
     //todo need to add unhandledPromises error handling.
     //The logs_errors functions sometimes dont capture errors that are the resultant of another function on a different page.
   }
   catch(e) {
-      logs_error("MAIN PROCESS ERROR".yellow,e.stack)
+    logs_error("MAIN PROCESS ERROR".yellow,e.stack)
   }
 }

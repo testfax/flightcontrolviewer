@@ -3,8 +3,8 @@ try {
   const { contextBridge, ipcRenderer } = require('electron')
   const fs = require('fs')
   const path = require('path')
-  const Store = require('electron-store');
-  const storez = new Store();
+  const Store = require('electron-store').default
+  const storez = new Store()
 
   contextBridge.exposeInMainWorld('ipcRenderer', {
     send: (channel, data) => {
@@ -19,6 +19,9 @@ try {
     removeListener: (channel, func) => {
       ipcRenderer.removeListener(channel, func);
     },
+    invoke: (channel, ...args) => {
+      return ipcRenderer.invoke(channel, ...args)
+    }
   })
   contextBridge.exposeInMainWorld('electronStoreMaterials', {
     set: (storeName, key, value) => {

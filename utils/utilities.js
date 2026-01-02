@@ -1,6 +1,6 @@
 const { app, BrowserWindow } = require('electron')
 const {logs,logs_error,logs_debug} = require('./logConfig')
-const Store = require('electron-store');
+const Store = require('electron-store').default
 const store = new Store({ name: 'electronWindowIds'})
 const path = require('path')
 const fs = require('fs')
@@ -9,7 +9,43 @@ const windowItemsStore = new Store({ name: 'electronWindowIds'})
 const showConsoleMessages = windowItemsStore.get('showConsoleMessages')
 const xml2js = require('xml2js')
 
-const util = {
+const util = { 
+    formatJsonObject: function(obj, indent) {
+        indent = indent || 0
+        var spaces = ''
+        for (var i = 0; i < indent; i++) spaces += ' '
+
+        if (Array.isArray(obj)) {
+            if (obj.every(function(v){ return v && v.rank_name && v.id })) {
+                var items = obj.map(function(item){
+                    return spaces + '    ' + JSON.stringify({ rank_name: item.rank_name, id: item.id })
+                })
+                return '[\n' + items.join(',\n') + '\n' + spaces + ']'
+            } else {
+                var items = obj.map(function(item){
+                    return util.formatJsonObject(item, indent + 2)
+                })
+                var paddedItems = items.map(function(i){
+                    var pad = ''
+                    for (var j = 0; j < indent/2 + 1; j++) pad += '  '
+                    return pad + i
+                })
+                return '[\n' + paddedItems.join(',\n') + '\n' + spaces + ']'
+            }
+        } else if (obj && typeof obj === 'object') {
+            var entries = Object.entries(obj).map(function(entry){
+                var key = entry[0]
+                var val = entry[1]
+                var keyValString = JSON.stringify(key) + ': ' + util.formatJsonObject(val, indent + 2)
+                return spaces + '  ' + keyValString
+            })
+            return '{\n' + entries.join(',\n') + '\n' + spaces + '}'
+        } else if (typeof obj === 'string') {
+            return JSON.stringify(obj)
+        } else {
+            return String(obj)
+        }
+    },
     convertXML: async(path) => {
         try {
             if (showConsoleMessages) { logs_debug("[XML]".bgYellow,"Reading actionsmap.xml") }
@@ -139,14 +175,23 @@ const util = {
             })
         }
     },
-    windowPosition: function(win,init) { 
+    windowPosition: function(win,init) {
+        
         //Since the intent is to get the window Size and Position, lets call the function that validates the path of the lounge-client.json
         //After that is received, lets call the Store function to get the contents of that file.
         //Then, once you receive the result from getting the contents of the lounge-client.json
         //Update the object with what you want and then send it back as instructions, the function expects an object once you send it.
-        let result = store.get("windowPosition")
-
+        let result = store.get("windowPosition") || {}
+        function saveWindowPosition() {
+            const moved = win.getPosition()
+            const resized = win.getSize()
+            result["clientPosition"] = moved 
+            result["clientSize"] = resized
+            store.set("windowPosition",result)
+        }
         if (!result.hasOwnProperty('clientSize')) { 
+            // return {moveTo:[700,100], resizeTo:[600,600]}
+            saveWindowPosition()
             return {moveTo:[700,100], resizeTo:[366,600]}
         }
         if (init) {
@@ -154,19 +199,15 @@ const util = {
             const moveTo = result.clientPosition; const resizeTo = result.clientSize;
             return { moveTo, resizeTo }
         }
-        if (result) {
-            const moved = win.getPosition()
-            const resized = win.getSize()
-            result["clientPosition"] = moved 
-            result["clientSize"] = resized
-            store.set("windowPosition",result)
-        }
+        else { saveWindowPosition() }
+        
+        
     },
     client_path: function(request) {
         // if (util.watcherConsoleDisplay('client_path') && request) {
         //     logs_debug("[UTIL]".green,"client_path:".blue,request);
         // }
-        let rsi_stockLocation = path.join('C:','Program Files','Roberts Space Industries','StarCitizen','4.0_PREVIEW')
+        let rsi_stockLocation = path.join('C:','Program Files','Roberts Space Industries','StarCitizen','LIVE')
         let rsi_path = path.normalize(rsi_stockLocation)
         const files = fs.readdirSync(rsi_path);
         let rsi_savedMappings = null

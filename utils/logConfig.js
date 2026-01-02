@@ -1,4 +1,9 @@
 try {
+    //!Master Switch is responsible for reporting the logs to the server.
+    const masterSwitch = 1 // 0 = Off, 1 = On.
+
+
+
     const colors = require('colors')
     const fs = require('fs')
     const path = require('path')
@@ -10,6 +15,91 @@ try {
         key: '\x1B[32m', // Green for keys
         stringValue: '\x1B[38;5;208m', // Orange for string values
         numberValue: '\x1B[33m' // Yellow for number values
+    }
+    const INDENT = 2
+    const pad = n => ' '.repeat(n)
+    function coloredPrimitive(v) {
+        if (typeof v === 'string') return `${colorz.stringValue}'${v}'${colorz.reset}`
+        if (typeof v === 'number') return `${colorz.numberValue}${v}${colorz.reset}`
+        if (typeof v === 'boolean') return `${colorz.numberValue}${v}${colorz.reset}`
+        if (v === null) return 'null'
+        if (v === undefined) return 'undefined'
+        return String(v)
+    }
+    function isArrayLikeObject(obj) {
+        if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false
+
+        const keys = Object.keys(obj)
+        const numeric = keys.filter(k => /^\d+$/.test(k)).map(k => Number(k)).sort((a,b) => a - b)
+        if (!numeric.length) return false
+
+        // must be 0..n-1 contiguous
+        for (let i = 0; i < numeric.length; i++) {
+            if (numeric[i] !== i) return false
+        }
+        return true
+    }
+    function formatValue(value, indent = 0) {
+        // arrays
+        if (Array.isArray(value)) {
+            if (value.length === 0) return '[]'
+
+            const items = value.map(v => `${pad(indent + INDENT)}${formatValue(v, indent + INDENT)}`).join(',\n')
+            return `[\n${items}\n${pad(indent)}]`
+        }
+
+        // objects (including array-like objects)
+        if (value && typeof value === 'object') {
+            // treat { "0": ..., "1": ..., receiver: ... } as:
+            // [
+            //   ...,
+            //   receiver: '...'
+            // ]
+            if (isArrayLikeObject(value)) {
+            const numericKeys = Object.keys(value).filter(k => /^\d+$/.test(k)).sort((a,b) => Number(a) - Number(b))
+            const extraKeys = Object.keys(value).filter(k => !/^\d+$/.test(k))
+
+            const parts = []
+
+            for (const k of numericKeys) {
+                parts.push(`${pad(indent + INDENT)}${formatValue(value[k], indent + INDENT)}`)
+            }
+
+            for (const k of extraKeys) {
+                const coloredKey = `${colorz.key}${k}${colorz.reset}`
+                const v = value[k]
+                const rendered = (v && typeof v === 'object')
+                ? formatValue(v, indent + INDENT)
+                : coloredPrimitive(v)
+
+                parts.push(`${pad(indent + INDENT)}${coloredKey}: ${rendered}`)
+            }
+
+            return `[\n${parts.join(',\n')}\n${pad(indent)}]`
+            }
+
+            const keys = Object.keys(value)
+            if (keys.length === 0) return '{}'
+
+            const lines = keys.map(k => {
+            const coloredKey = `${colorz.key}${k}${colorz.reset}`
+            const v = value[k]
+
+            if (v && typeof v === 'object') {
+                return `${pad(indent + INDENT)}${coloredKey}: ${formatValue(v, indent + INDENT)}`
+            }
+
+            return `${pad(indent + INDENT)}${coloredKey}: ${coloredPrimitive(v)}`
+            }).join(',\n')
+
+            return `{\n${lines}\n${pad(indent)}}`
+        }
+
+        // primitives
+        return coloredPrimitive(value)
+    }
+    function colorizeAny(value) {
+        return formatValue(value, 0)
     }
     function colorizeObject(obj) {
         return Object.entries(obj).map(([key, value]) => {
@@ -50,7 +140,7 @@ try {
             console.log("[LOGS]".red,error)
         }
     }
-    
+
     function getCitizen() {
         try {
             const extractHandle = (line) => {
@@ -72,7 +162,7 @@ try {
         catch(e) { console.log("[LOGS]".red,"getCitizen: No Game Logs Yet...",e) }
     }
     function client_path(request) {
-        let rsi_stockLocation = path.join('C:','Program Files','Roberts Space Industries','StarCitizen','4.0_PREVIEW')
+        let rsi_stockLocation = path.join('C:','Program Files','Roberts Space Industries','StarCitizen','LIVE')
         let rsi_path = path.normalize(rsi_stockLocation)
         const files = fs.readdirSync(rsi_path);
         let rsi_savedMappings = null
@@ -95,79 +185,101 @@ try {
     }
     const theCitizen = getCitizen()
     console.log("theCitizen:".yellow,theCitizen)
-
-    log.initialize({ preload: true });
-    // log.transports.file.file = 'session.log'; // Set a fixed filename for the log
-    log.transports.file.level = 'verbose';
-    log.transports.file.format = '{h}:{i}:{s}:{ms} [{level}] {text}'; // Customize log formatpm2 
-    log.transports.file.maxSize = 10 * 1024 * 1024; // Set maximum log file size
-    log.transports.file.maxFiles = 3; // Limit the number of log files
-    log.transports.remote = (logData) => { 
-        const formattedLogData = {
-            citizen: theCitizen,
-            gameLog:  path.basename(lastLogs(client_path("LogBackups").rsi_requested,"log","0")[0]),
-            timestamp: new Date(),
-            level: logData.level,
-            message: logData.data,
-        };
-        if (theCitizen) {
-            try {
-                const requestPromise = fetch('http://elitepilotslounge.com:3003/', {
-                    method: 'POST',
-                    body: JSON.stringify(formattedLogData),
-                    headers: { 'Content-Type': 'application/json' },
-                });
-                const timeoutPromise = new Promise((resolve, reject) => {
-                setTimeout(() => {
-                    reject(new Error('Request timeout'));
-                }, 1000); // Set a 500ms timeout
-                });
-
-                Promise.race([requestPromise, timeoutPromise])
-                .then(response => {
-                    if (!response.status) {
-                        // throw new Error('HTTP error: ' + response.status);
-                        logsUtil.logs_error('HTTP error: ' + response.status)
-                    }
-                    // Process the response here
-                })
-                .catch(error => {
-                    // logsUtil.logs_error('logConfig->Fetch', error);
-                });
-            }
-            catch (e) {
-                console.log(e);
-            }
-            
-        }
-        else { 
-            logsUtil.logs_error("[LOGS]".red,"Remote Temp Disabled: NO CITIZEN".yellow)
-            return
-        }
-    }
+    if (masterSwitch) {
+        log.initialize({ preload: true });
+        // log.transports.file.file = 'session.log'; // Set a fixed filename for the log
+        log.transports.file.level = 'verbose';
+        log.transports.file.format = '{h}:{i}:{s}:{ms} [{level}] {text}'; // Customize log formatpm2 
+        log.transports.file.maxSize = 10 * 1024 * 1024; // Set maximum log file size
+        log.transports.file.maxFiles = 3; // Limit the number of log files
+        log.transports.remote = (logData) => { 
+            const formattedLogData = {
+                citizen: theCitizen,
+                gameLog:  path.basename(lastLogs(client_path("LogBackups").rsi_requested,"log","0")[0]),
+                timestamp: new Date(),
+                level: logData.level,
+                message: logData.data,
+            };
+            if (theCitizen) {
+                try {
+                    const requestPromise = fetch('http://elitepilotslounge.com:3003/', {
+                        method: 'POST',
+                        body: JSON.stringify(formattedLogData),
+                        headers: { 'Content-Type': 'application/json' },
+                    });
+                    const timeoutPromise = new Promise((resolve, reject) => {
+                    setTimeout(() => {
+                        reject(new Error('Request timeout'));
+                    }, 1000); // Set a 500ms timeout
+                    });
     
-    const logsUtil = {
-        logs: async (...input) => {
-            let logMessage = input.map(item => {
-                if (typeof item === 'object') {
-                    return colorizeJSON(JSON.stringify(item, null, 2));
-                } else {
-                    return item;
+                    Promise.race([requestPromise, timeoutPromise])
+                    .then(response => {
+                        if (!response.status) {
+                            // throw new Error('HTTP error: ' + response.status);
+                            logsUtil.logs_error('HTTP error: ' + response.status)
+                        }
+                        // Process the response here
+                    })
+                    .catch(error => {
+                        // logsUtil.logs_error('logConfig->Fetch', error);
+                    });
                 }
-            }).join(' ');
-            log.info(logMessage);
+                catch (e) {
+                    console.log(e);
+                }
+                
+            }
+            else { 
+                logsUtil.logs_error("[LOGS]".red,"Remote Temp Disabled: NO CITIZEN".yellow)
+                return
+            }
+        }
+        
+    }
+    const logsUtil = {
+        logs_warn: (...input) => {
+            // console.log("LOGS_WARN".bgCyan)
+            const logMessage = input.map(item => {
+                if (item && typeof item === 'object') return colorizeAny(item)
+                return item
+            }).join(' ')
+            log.warn(logMessage)
+        },
+        logs: (...input) => {
+            // console.log("LOGS".bgCyan)
+            const logMessage = input.map(item => {
+                if (item && typeof item === 'object') return colorizeAny(item)
+                return item
+            }).join(' ')
+            log.info(logMessage)
         },
         logs_error: async (...input) => {
-            let logMessage = input.map(item => {
-                if (typeof item === 'object') {
-                    return colorizeJSON(JSON.stringify(item, null, 2));
-                } else {
-                    return item;
-                }
-            }).join(' ');
-            log.error(logMessage)
+            const err = await input[0]
+            // console.log("LOGS_ERROR".bgCyan,input)
+            if (typeof err == 'object') {
+                //usually IPC main errors and has error object
+                const serializeError = err => ({
+                    name: err.name,
+                    message: err.message,
+                    stack: err.stack,
+                    cause: err.cause ? serializeError(err.cause) : undefined
+                })
+                serializeError(err)
+                const logMessage = colorizeJSON(JSON.stringify(serializeError(err), null, 2))
+                log.error(logMessage)
+            }
+            else {
+                //usually renderer errors and has error string
+                const logMessage = input.map(item => {
+                    if (item && typeof item === 'object') return colorizeAny(item)
+                    return item
+                }).join(' ')
+                log.info(logMessage)
+            }
         },
         logs_debug: async (...input) => {
+            // console.log("LOGS_DEBUG".bgCyan)
             let logMessage = input.map(item => {
                 if (typeof item === 'object') {
                     return colorizeJSON(JSON.stringify(item, null, 2));
