@@ -4,8 +4,8 @@
     "grip": "VPC Constellation ALPHA Prime",
     "hand": "L",
     "product": "L-VPC Stick WarBRD-D",
-    "vid": "3344",
-    "pid": "03F3"
+    "vid": "0",
+    "pid": "0"
   },
   "overlays": {
     "main": {

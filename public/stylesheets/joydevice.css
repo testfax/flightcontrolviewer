@@ -1,3 +1,6 @@
+.is-hidden {
+  display: none !important;
+}
 /* host that will contain 2 stacked view canvases (side/back) */
 .joy_device_canvas {
   width: 420px;
@@ -55,6 +58,7 @@
 .joy_spot_label.hover {
   fill: rgba(255,255,255,0.95);
 }
+
 /* background behind the label, auto-sized */
 .joy_spot_label_bg {
   fill: rgba(0,0,0,0.85);
@@ -67,6 +71,7 @@
 .joy_spot_label_bg.active {
   stroke: rgba(0,255,0,0.75);
 }
+
 /* group overlay boxes (one per group) */
 .joy_group_overlays {
   display: flex;
@@ -115,6 +120,8 @@
 .bind_entry {
   white-space: pre-line;
   color: #ff9800;
+
+  display: block;          /* ✅ each bind span goes to its own line */
 }
 
 /* ✅ active bind always green */

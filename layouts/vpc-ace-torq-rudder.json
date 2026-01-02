@@ -3,15 +3,15 @@
 
   "device": {
     "product": "VPC ACE-Torq Rudder",
-    "vid": "3344",
-    "pid": "01F9"
+    "vid": "0",
+    "pid": "0"
   },
 
   "overlays": {
     "main": {
       "image": "vpc-ace-torq-rudder.png",
-      "sheet": { "w": 1000, "h": 1000 },
-      "viewBox": "0 0 1000 1000"
+      "sheet": { "w": 1200, "h": 1200 },
+      "viewBox": "0 0 1200 1200"
     }
   },
 

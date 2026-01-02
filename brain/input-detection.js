@@ -492,12 +492,6 @@ function startInputLoggerForDevice(d, parsed) {
   // suppress repeats if the exact same control was the last one reported
   let lastReported = ''
 
-  function reportOnce(keyStr) {
-    if (keyStr === lastReported) return false
-    lastReported = keyStr
-    return true
-  }
-
   // block axis reporting for 1s after any button press
   let lastButtonAt = 0
   const AXIS_BLOCK_AFTER_BUTTON_MS = 1000
@@ -505,6 +499,29 @@ function startInputLoggerForDevice(d, parsed) {
   const CENTER_PERCENT = 0.10
   const MOVE_PERCENT = 0.02
   const AXIS_COOLDOWN_MS = 1000
+
+  // ------------------------------------------------------------
+  // SINGLE-AXIS EXCEPTION:
+  // If this device only has 1 axis total, allow repeating that axis
+  // even if it was the lastReported control.
+  // ------------------------------------------------------------
+  const axisNames = new Set()
+  for (const list of parsed.axesByReport.values()) {
+    for (const a of list) axisNames.add(a.name)
+  }
+  const isSingleAxisDevice = axisNames.size === 1
+  const singleAxisOutKey = isSingleAxisDevice
+    ? `${prefix}axis_${Array.from(axisNames)[0]}`
+    : null
+
+  function reportOnce(keyStr) {
+    if (keyStr === lastReported) {
+      // only bypass "same as lastReported" for the single axis on single-axis devices
+      if (!(isSingleAxisDevice && keyStr === singleAxisOutKey)) return false
+    }
+    lastReported = keyStr
+    return true
+  }
 
   device.on('data', (data) => {
     let rid = 0
@@ -659,9 +676,9 @@ function startInputLoggerForDevice(d, parsed) {
   device.on('error', (err) => {
     logs_error(err)
     setTimeout(() => {
-      console.log("[BRAIN]".bgCyan, "RESTARTING AFTER DEVICE LOST".red)
-        app.relaunch()
-        app.exit(0)
+      console.log('[BRAIN]'.bgCyan, 'RESTARTING AFTER DEVICE LOST'.red)
+      app.relaunch()
+      app.exit(0)
     }, 8000)
   })
 }
