@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../../../AppData/Roaming/flightcontrolviewer"
+		},
+		{
+			"path": "../../../../../Program Files/Roberts Space Industries/StarCitizen/LIVE/user/client/0/Profiles/default"
+		}
+	],
+	"settings": {}
+}
