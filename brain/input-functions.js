@@ -11,6 +11,7 @@ try {
 
     const utilities = {
         keybindLoad: function() {
+            let missingStuff = []
             try {
                 const { convertXML,client_path } = require('../utils/utilities')
                 const actionmaps = new Store({ name: 'actionmapsJSON'})
@@ -71,7 +72,7 @@ try {
                                         logs_error('Category name is missing')
                                         return
                                     }
-                            
+                                    
                                     const actions = Array.isArray(category.action) ? category.action : [category.action]
                                     actions.forEach(action => {
                                         if (action.rebind) {

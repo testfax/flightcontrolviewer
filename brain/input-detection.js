@@ -1,6 +1,6 @@
 const devMode = { devMode: 0 }
 
-const { logs_warn, logs, logs_error, logs_debug } = require('../utils/logConfig')
+const { logs_translate, logs_warn, logs, logs_error, logs_debug } = require('../utils/logConfig')
 const { blastToUI } = require('../brain/input-functions')
 const { runWinHidDump, getWinHidDumpPath } = require('../utils/utilities')
 const HID = require('node-hid')
@@ -1125,4 +1125,7 @@ ipcMain.on('renderer-response-error', (event,message,location) => {
 })
 ipcMain.on('renderer-response-unhandled-error', (event,message,location) => {
     logs_error("[RENDERER-UNHANDLED-ERROR]".bgRed,message,location)
+})
+ipcMain.on('renderer-response-report-translationIssues', (event,message) => {
+    logs_translate("[RENDERER-translationIssues]".bgRed,message)
 })

@@ -509,14 +509,36 @@ try {
             for (const category in groupedActions) {
               if (package.keybindArticulation) {
                 const cat = package.keybindArticulation.categories[category]
-                if (cat) screenReady += `${cat}\n`
-                else screenReady += `${package.detection} CAT: ${category}\n`
+                const translateIssues = {}
+                if (cat) {screenReady += `${cat}\n`}
+                else {
+                  screenReady += `${package.detection} CAT: ${category}\n`
+                  translateIssues["category"] = category
+                }
 
                 groupedActions[category].forEach(action => {
                   const act = package.keybindArticulation.actions[action]
-                  if (act) screenReady += `-> ${act}\n`
-                  else screenReady += `- ! ! ! ACTION ! ! !: ${action}\n`
+                  if (act) {screenReady += `-> ${act}\n`}
+                  else {
+                    screenReady += `- ! ! ! ACTION ! ! !: ${action}\n`
+                    translateIssues["action"] = action
+                  }
                 })
+                if (Object.keys(translateIssues).length > 0) {
+                  switch (translateIssues.action) {
+                    case 'ui_hide_hint':
+                    case 'flashui_backspace':
+                    case 'flashui_kp_3':
+                    case 'flashui_kp_4':
+                    case 'retry':
+                      // intentionally ignored
+                      break
+
+                    default:
+                      ipcRenderer.send('renderer-response-report-translationIssues',translateIssues)
+                  }
+
+                }
               }
             }
             return screenReady

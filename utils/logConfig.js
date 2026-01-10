@@ -274,6 +274,14 @@ try {
         
     }
     const logsUtil = {
+        logs_translate: (...input) => {
+            // console.log("LOGS_TRANSLATE".bgCyan,input)
+            const logMessage = input.map(item => {
+                if (item && typeof item === 'object') return colorizeAny(item)
+                return item
+            }).join(' ')
+            log.warn(logMessage)
+        },
         logs_warn: (...input) => {
             // console.log("LOGS_WARN".bgCyan)
             const logMessage = input.map(item => {
