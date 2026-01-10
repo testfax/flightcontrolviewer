@@ -4,6 +4,7 @@ const Store = require('electron-store').default
 const store = new Store({ name: 'electronWindowIds'})
 const path = require('path')
 const fs = require('fs')
+const os = require('os')
 const colors = require('colors')
 const windowItemsStore = new Store({ name: 'electronWindowIds'})
 const showConsoleMessages = windowItemsStore.get('showConsoleMessages')
@@ -184,63 +185,7 @@ const util = {
         // Now start the check AFTER listeners are attached
         await autoUpdater.checkForUpdatesAndNotify()
     },
-    // autoUpdater: async () => {
-    //     // Auto Updater
-    //     if (app.isPackaged) { 
-    //         const win = BrowserWindow.fromId(1)
-    //         const { autoUpdater } = require('electron-updater')
-    //         logs_debug("Running Auto-Updater Functions".yellow)
-    //         autoUpdater.logger = require('electron-log')
-    //         autoUpdater.checkForUpdatesAndNotify();
-
-    //         // autoUpdater.logger.transports.file.level = 'info';
-    //         // autoUpdater.autoDownload = true
-    //         // autoUpdater.autoInstallOnAppQuit = true
-    //         autoUpdater.on('download-progress', (progressObj) => {
-    //             const thisPercent = progressObj.percent / 100
-    //             const formattedNumber = (thisPercent).toLocaleString(undefined, { style: 'percent', minimumFractionDigits:1});
-    //                 win.setTitle(`Flight Control Viewer - ${JSON.stringify(app.getVersion())} Downloading New Update ${formattedNumber}`)
-    //             })
-    //             autoUpdater.on('error',(error)=>{ 
-
-    //             })
-    //             autoUpdater.on('checking-for-update', (info)=>{
-    //                 if (!info) { 
-    //                     win.setTitle(`Flight Control Viewer - ${JSON.stringify(app.getVersion())} Checking for Updates "NONE"`) }
-    //                 else {
-    //                 win.setTitle(`Flight Control Viewer - ${JSON.stringify(app.getVersion())} Checking for Updates ${info}`)
-    //                 }
-    //             })
-    //             autoUpdater.on('update-available',(info)=>{
-    //                 win.setTitle(`Flight Control Viewer - ${JSON.stringify(app.getVersion())} - ${JSON.stringify(info.version)} Update Available, download pending... please wait...`)
-    //             })
-    //             autoUpdater.on('update-not-available',(info)=>{
-    //                 // logs_debug(`-AU update-not-available: ${JSON.stringify(info)}`)
-    //             })
-    //             autoUpdater.on('update-downloaded',(info)=>{
-    //             dialog.showMessageBox({
-    //                 type: 'info',
-    //                 title: 'Update Available',
-    //                 message: 'A new version of the app is available. App will now automatically install and restart once completed.',
-    //                 buttons: ['Continue']
-    //             }).then((result) => {
-    //                 if (result.response === 0) {
-    //                 // User chose to install now, quit the app and install the update.
-    //                 // const appDataFolderPath = path.join(process.env.APPDATA, 'elitepilotslounge');
-    //                 // //Removes the roaming folder for a clean install.
-    //                 // //Have seen users not be able to load the program, due to corrupted roaming/elitepilotslounge.
-    //                 // if (fs.existsSync(appDataFolderPath)) {
-    //                 //   console.log(appDataFolderPath)
-    //                 //   fs.rmdirSync(appDataFolderPath, { recursive: true });
-    //                 // }
-    //                 autoUpdater.quitAndInstall();
-    //                 }
-    //             });
-    //         })
-    //     }
-    // },
     windowPosition: function(win,init) {
-        
         //Since the intent is to get the window Size and Position, lets call the function that validates the path of the lounge-client.json
         //After that is received, lets call the Store function to get the contents of that file.
         //Then, once you receive the result from getting the contents of the lounge-client.json
@@ -271,7 +216,50 @@ const util = {
         // if (util.watcherConsoleDisplay('client_path') && request) {
         //     logs_debug("[UTIL]".green,"client_path:".blue,request);
         // }
-        let rsi_stockLocation = path.join('C:','Program Files','Roberts Space Industries','StarCitizen','LIVE')
+        function findStarCitizenLive() {
+            const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming')
+            const gameLogPath = path.join(appData, 'Star Citizen', 'game.log')
+
+            // 1️⃣ Read game.log and extract Executable path
+            if (fs.existsSync(gameLogPath)) {
+                try {
+                const log = fs.readFileSync(gameLogPath, 'utf8')
+
+                // Example:
+                // Executable: C:\Program Files\Roberts Space Industries\StarCitizen\LIVE\Bin64\StarCitizen.exe
+                const match = log.match(/^Executable:\s+(.+)$/m)
+
+                if (match) {
+                    const exePath = match[1].trim()
+
+                    // Bin64 -> LIVE
+                    const livePath = path.resolve(path.dirname(exePath), '..')
+
+                    if (fs.existsSync(livePath)) {
+                    return livePath
+                    }
+                }
+                } catch (err) {
+                console.error('Failed to read Star Citizen game.log', err)
+                }
+            }
+
+            // 2️⃣ Final fallback: default install
+            const defaultPath = path.join(
+                'C:',
+                'Program Files',
+                'Roberts Space Industries',
+                'StarCitizen',
+                'LIVE'
+            )
+
+            if (fs.existsSync(defaultPath)) {
+                return defaultPath
+            }
+
+            return null
+        }
+        let rsi_stockLocation = findStarCitizenLive()
         let rsi_path = path.normalize(rsi_stockLocation)
         const files = fs.readdirSync(rsi_path);
         let rsi_savedMappings = null
@@ -316,7 +304,6 @@ const util = {
         return path.join(__dirname, '..', 'helpers', 'winhiddump', 'winhiddump.exe')
     },
     runWinHidDump: function() {
-        
         const exePath = util.getWinHidDumpPath()
         return execFileSync(exePath, [], { encoding: 'utf8', windowsHide: true })
     }

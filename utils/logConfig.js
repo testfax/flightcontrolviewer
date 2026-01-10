@@ -162,41 +162,49 @@ try {
     }
     function client_path(request) {
         function findStarCitizenLive() {
-            const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming')
-            const rsiSettingsPath = path.join(appData, 'rsilauncher', 'settings.json')
+        const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming')
+        const gameLogPath = path.join(appData, 'Star Citizen', 'game.log')
 
-            // 1️⃣ Try RSI launcher settings
-            if (fs.existsSync(rsiSettingsPath)) {
-                try {
-                const settings = JSON.parse(fs.readFileSync(rsiSettingsPath, 'utf8'))
-                const folders = settings?.library?.folders || []
+        // 1️⃣ Read game.log and extract Executable path
+        if (fs.existsSync(gameLogPath)) {
+            try {
+            const log = fs.readFileSync(gameLogPath, 'utf8')
 
-                for (const folder of folders) {
-                    const livePath = path.join(folder.path, 'StarCitizen', 'LIVE')
-                    if (fs.existsSync(livePath)) {
-                    return livePath
-                    }
-                }
-                } catch (err) {
-                console.error('Failed to parse RSI settings.json', err)
+            // Example:
+            // Executable: C:\Program Files\Roberts Space Industries\StarCitizen\LIVE\Bin64\StarCitizen.exe
+            const match = log.match(/^Executable:\s+(.+)$/m)
+
+            if (match) {
+                const exePath = match[1].trim()
+
+                // Bin64 -> LIVE
+                const livePath = path.resolve(path.dirname(exePath), '..')
+
+                if (fs.existsSync(livePath)) {
+                return livePath
                 }
             }
-
-            // 2️⃣ Fallback: default install
-            const defaultPath = path.join(
-                'C:',
-                'Program Files',
-                'Roberts Space Industries',
-                'StarCitizen',
-                'LIVE'
-            )
-
-            if (fs.existsSync(defaultPath)) {
-                return defaultPath
+            } catch (err) {
+            console.error('Failed to read Star Citizen game.log', err)
             }
-
-            return null
         }
+
+        // 2️⃣ Final fallback: default install
+        const defaultPath = path.join(
+            'C:',
+            'Program Files',
+            'Roberts Space Industries',
+            'StarCitizen',
+            'LIVE'
+        )
+
+        if (fs.existsSync(defaultPath)) {
+            return defaultPath
+        }
+
+        return null
+        }
+
         let rsi_stockLocation = findStarCitizenLive()
         // let rsi_stockLocation = path.join('C:','Program Files','Roberts Space Industries','StarCitizen','LIVE')
         let rsi_path = path.normalize(rsi_stockLocation)
