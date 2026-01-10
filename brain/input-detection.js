@@ -183,6 +183,7 @@ function toSigned(valueUnsigned, bitSize) {
   return -(((~valueUnsigned) & fullMask) + 1)
 }
 function usageName(usagePage, usage) {
+  logs_debug('[usageName]'.bgBlue, 'input-detection'.yellow, `usagePage=${usagePage.toString(16)}, usage=${usage.toString(16)}`)
   if (usagePage === 0x01) {
     switch (usage) {
       case 0x30: return 'x'
@@ -194,7 +195,7 @@ function usageName(usagePage, usage) {
       case 0x36: return 'slider'
       case 0x37: return 'dial'
       case 0x38: return 'wheel'
-      case 0x39: return 'hat' // ✅ Generic Desktop 0x39 = Hat Switch (POV)
+      case 0x39: return 'hat1' // ✅ Generic Desktop 0x39 = Hat Switch (POV)
       default: return `gd_${usage.toString(16)}`
     }
   }
@@ -558,6 +559,9 @@ function startInputLoggerForDevice(d, parsed) {
     ? `${prefix}axis_${Array.from(axisNames)[0]}`
     : null
 
+  // ✅ warn once per unexpected RID per device
+  const unknownRidWarned = new Set()
+
   function reportOnce(keyStr) {
     if (keyStr === lastReported) {
       // only bypass "same as lastReported" for the single axis on single-axis devices
@@ -574,6 +578,27 @@ function startInputLoggerForDevice(d, parsed) {
     if (parsed.hasReportIds) {
       rid = data[0]
       payload = data.slice(1)
+
+      // ✅ FIX: if we receive a RID we don't have in the parsed maps, fall back to non-RID parsing
+      const hasRid = parsed.buttonsByReport.has(rid) || parsed.axesByReport.has(rid)
+      if (!hasRid) {
+        if (!unknownRidWarned.has(rid)) {
+          unknownRidWarned.add(rid)
+          const haveRids = Array.from(new Set([
+            ...parsed.buttonsByReport.keys(),
+            ...parsed.axesByReport.keys()
+          ])).sort((a, b) => a - b)
+          logs_warn('[BRAIN]'.bgYellow, 'input-detection'.yellow, 'Unknown RID from device (falling back to rid=0)'.red, {
+            gotRid: rid,
+            haveRids,
+            len: data.length,
+            product: d.product,
+            path: d.path
+          })
+        }
+        rid = 0
+        payload = data
+      }
     }
 
     const buttons = parsed.buttonsByReport.get(rid) || []
@@ -841,7 +866,6 @@ function joySubmit(data) {
   // console.log("package:".yellow,package)
   blastToUI(package)
 }
-
 // Collect ALL buttons across all report IDs (instead of only report '1')
 function countAllButtonsFromPlain(parsedInputs) {
   const byRid = parsedInputs && parsedInputs.buttonsByReport ? parsedInputs.buttonsByReport : {}
@@ -852,7 +876,6 @@ function countAllButtonsFromPlain(parsedInputs) {
   }
   return count
 }
-
 // Collect ALL axes across all report IDs (instead of only report '1')
 function collectAllAxisNamesFromPlain(parsedInputs) {
   const byRid = parsedInputs && parsedInputs.axesByReport ? parsedInputs.axesByReport : {}
@@ -866,7 +889,6 @@ function collectAllAxisNamesFromPlain(parsedInputs) {
   }
   return out
 }
-
 async function main() {
   const devices = listAllJoysticks()
   if (!devices.length) {
