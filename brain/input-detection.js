@@ -975,9 +975,14 @@ function initializeUI(data, receiver) {
       .sort((a, b) => a.position - b.position)
     sortedPackage['receiver'] = receiver
     sortedPackage = { ...sortedPackage, ...devMode }
-
+    const pkg = {
+      receiver,
+      appVersion: app.getVersion(),
+      message: JSON.stringify(sortedPackage, null, 2),
+      devMode
+    }
     blastToUI(sortedPackage)
-    logs_warn(sortedPackage)
+    logs_warn(pkg)
   }
 }
 function setupUI(data, receiver) {
@@ -1013,6 +1018,7 @@ function setupUI(data, receiver) {
 
   const pkg = {
     receiver,
+    appVersion: app.getVersion(),
     message: JSON.stringify(sortedPackage, null, 2),
     devMode
   }
