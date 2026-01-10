@@ -302,11 +302,14 @@ const util = {
             rsi_requested
         }
     },
-    getWinHidDumpPath: function() {
-      // DEV: <projectRoot>\helpers\win\win-hid-dump.exe
-      // PACKAGED: <install>\resources\helpers\win\win-hid-dump.exe (extraResources -> process.resourcesPath)
-      const base = app.isPackaged ? process.resourcesPath : process.cwd()
-      return path.join(base, 'helpers', 'winhiddump', 'winhiddump.exe')
+    getWinHidDumpPath: function () {
+        if (app.isPackaged) {
+            // your install layout appears to be: resources\app\...
+            return path.join(process.resourcesPath, 'app', 'helpers', 'winhiddump', 'winhiddump.exe')
+        }
+
+        // dev path (adjust to your repo layout)
+        return path.join(__dirname, '..', 'helpers', 'winhiddump', 'winhiddump.exe')
     },
     runWinHidDump: function() {
         
