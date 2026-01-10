@@ -20,19 +20,11 @@
     "asar": false,
 
     "win": {
-      "target": "nsis",
-      "icon": "build/icon.ico"
-    },
-
-    "nsis": {
-      "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico",
-      "installerHeaderIcon": "build/icon.ico"
+      "target": "nsis"
     },
 
     "linux": {
       "target": ["deb", "rpm", "AppImage", "snap", "portable"],
-      "icon": "build/icon.png",
       "extraResources": [
         { "from": "helpers", "to": "helpers" }
       ]
