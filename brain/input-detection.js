@@ -913,37 +913,43 @@ function initializeUI(data, receiver) {
   }
 }
 function setupUI(data, receiver) {
-  if (windowItemsStore.get('currentPage') == 'setup') {
-    let package = {}
-    for (const item in data) {
-      if (!data[item].product) continue
-      const prod = data[item].key
-      const parsed = data[item].parsedInputs
-      if (!package[prod]) {
-        package[prod] = {
-          key: data[item].key.split("|")[0],
-          product: data[item].product,
-          vid: data[item].vendorId,
-          pid: data[item].productId,
-          prefix: data[item].prefix.split("_")[0],
-          position: data[item].jsIndex,
-          buttons:  data[item].parsedInputs.buttonsByReport['1']?.length || 0,
-          axes: []
-        }
+  if (windowItemsStore.get('currentPage') !== 'setup') return
+
+  const byProd = {}
+
+  for (const item in data) {
+    if (!data[item]?.product) continue
+
+    const prod = data[item].key
+    const parsed = data[item].parsedInputs
+
+    if (!byProd[prod]) {
+      byProd[prod] = {
+        key: String(data[item].key).split('|')[0],
+        product: data[item].product,
+        vid: data[item].vendorId,
+        pid: data[item].productId,
+        prefix: String(data[item].prefix).split('_')[0],
+        position: data[item].jsIndex,
+        buttons: parsed?.buttonsByReport?.['1']?.length || 0,
+        axes: []
       }
-      const axesArr = parsed.axesByReport?.['1'] || []
-      package[prod].axes = axesArr.map(a => a.name)
     }
-    let sortedPackage = Object.values(package)
-      .sort((a, b) => a.position - b.position)
-    sortedPackage['receiver'] = receiver
-    sortedPackage = { ...sortedPackage, ...devMode }
 
-    // console.log("SortedPackage",sortedPackage)
-
-    blastToUI(sortedPackage)
-    logs_warn(sortedPackage)
+    const axesArr = parsed?.axesByReport?.['1'] || []
+    byProd[prod].axes = axesArr.map(a => a.name)
   }
+
+  const sortedPackage = Object.values(byProd).sort((a, b) => a.position - b.position)
+
+  const pkg = {
+    receiver,
+    message: JSON.stringify(sortedPackage, null, 2),
+    devMode
+  }
+
+  blastToUI(pkg)
+  logs_warn(pkg)
 }
 function resolveLayoutsDir(app, path) {
   return path.join(app.getAppPath(), 'layouts')
@@ -1059,6 +1065,8 @@ ipcMain.on('setupPage', async (receivedData) => {
       main()
       setTimeout(() => {
         init = 0
+        const package = { receiver: "from_brain-detection-ready", data: 1 }
+        blastToUI(package)
         console.log('=== Ready to Receive Inputs ==='.green)
       }, 2000)
   },1000)

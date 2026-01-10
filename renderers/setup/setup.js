@@ -109,21 +109,30 @@ try {
   ipcRenderer.on('from_brain-detection-ready', async package => {
     const thisDeviceEl = document.getElementById('thisDevice')
         if (thisDeviceEl) {
-          thisDeviceEl.innerText = "Move a Device to Begin...."
+          thisDeviceEl.innerText = ""
         }
   })
-  ipcRenderer.on('from_brain-detection', async package => {
-    // devMode = package.devMode
-    // console.log("MODE:", devMode)
-    try {
-      console.log(package)
-    }
-    catch (err) {
-      ipcRenderer.send('renderer-response-unhandled-error', serializeError(err), location)
-    }
-      
-    
-  })
+  ipcRenderer.on('from_brain-detection', package => {
+  try {
+    const el = document.getElementById('log')
+    if (!el) return
+
+    let msg = package?.message
+
+    if (msg == null) msg = package
+    if (typeof msg !== 'string') msg = JSON.stringify(msg, null, 2)
+
+    if (el.textContent && !el.textContent.endsWith('\n')) el.textContent += '\n'
+    el.textContent += msg + '\n'
+  } catch (err) {
+    ipcRenderer.send(
+      'renderer-response-unhandled-error',
+      serializeError(err),
+      location
+    )
+  }
+})
+
 } catch (err) {
   console.log('ipcMAIN', err)
   if (window.ipcRenderer) window.ipcRenderer.send('renderer-response-unhandled-error', serializeError(err), location)
