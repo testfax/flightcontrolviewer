@@ -182,8 +182,13 @@ function toSigned(valueUnsigned, bitSize) {
   const fullMask = (1 << bitSize) - 1
   return -(((~valueUnsigned) & fullMask) + 1)
 }
+
+// ------------------------------
+// HID Usage naming
+// ------------------------------
 function usageName(usagePage, usage) {
-  logs_debug('[usageName]'.bgBlue, 'input-detection'.yellow, `usagePage=${usagePage.toString(16)}, usage=${usage.toString(16)}`)
+  logs('[usageName]'.bgBlue, 'input-detection'.yellow, `usagePage=${usagePage.toString(16)}, usage=${usage.toString(16)}`)
+
   if (usagePage === 0x01) {
     switch (usage) {
       case 0x30: return 'x'
@@ -195,7 +200,7 @@ function usageName(usagePage, usage) {
       case 0x36: return 'slider'
       case 0x37: return 'dial'
       case 0x38: return 'wheel'
-      case 0x39: return 'hat1' // ✅ Generic Desktop 0x39 = Hat Switch (POV)
+      case 0x39: return 'hat1' // ✅ Hat Switch (POV) is NOT a button and not an analog axis; we will treat specially
       default: return `gd_${usage.toString(16)}`
     }
   }
@@ -217,6 +222,13 @@ function shouldKeepAxis(usagePage, usage, bitSize, logicalMin, logicalMax) {
   if (typeof logicalMin === 'number' && typeof logicalMax === 'number' && logicalMin === logicalMax) return false
 
   return true
+}
+
+// Hat Switch: commonly 4 bits with values 0-7 and 8/15 meaning "neutral"
+function isHatAxis(usagePage, usage, name) {
+  if (usagePage === 0x01 && usage === 0x39) return true
+  if (name === 'hat' || String(name).startsWith('hat')) return true
+  return false
 }
 
 // ---------- Parse descriptor -> buttons + axes ----------
@@ -361,12 +373,14 @@ function parseInputsFromReportDescriptor(descBuf) {
 
       if (!isConstant && isVariable && sizeBits > 0 && sizeBits <= 31) {
         if (state.usagePage === 0x09) {
+          // Buttons (Button Page)
           for (let idx = 0; idx < count; idx += 1) {
             let usage = fieldUsages[idx]
             if (usage == null) usage = (idx + 1)
             addButton(rid, usage, startBit + (idx * sizeBits), sizeBits)
           }
         } else {
+          // Axes / other variable inputs
           for (let idx = 0; idx < count; idx += 1) {
             const usage = fieldUsages[idx]
             if (usage == null) continue
@@ -468,13 +482,11 @@ function learnAndPersistDevice(d, dumpText) {
   if (!extracted.ok || !extracted.buf) return null
 
   const parsed = parseInputsFromReportDescriptor(extracted.buf)
-  // console.log('PARSED:'.red, parsed.hasReportIds)
 
   let totalButtons = 0
   for (const arr of parsed.buttonsByReport.values()) totalButtons += arr.length
   let totalAxes = 0
   for (const arr of parsed.axesByReport.values()) totalAxes += arr.length
-  // console.log('TotalButtons:'.green, totalButtons, 'TotalAxes:'.green, totalAxes)
 
   if (totalButtons === 0 && totalAxes === 0) return null
 
@@ -511,6 +523,25 @@ function learnAndPersistDevice(d, dumpText) {
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
+
+// Convert HID hat value to virtual direction buttons
+// Common: 0=Up,1=UpRight,2=Right,3=DownRight,4=Down,5=DownLeft,6=Left,7=UpLeft, 8 or 15 = neutral
+function hatValueToDirs(v) {
+  const val = Number(v)
+  if (!Number.isFinite(val)) return { up: 0, right: 0, down: 0, left: 0, neutral: 1 }
+
+  if (val === 8 || val === 15) return { up: 0, right: 0, down: 0, left: 0, neutral: 1 }
+
+  const dirs = {
+    up: (val === 0 || val === 1 || val === 7) ? 1 : 0,
+    right: (val === 1 || val === 2 || val === 3) ? 1 : 0,
+    down: (val === 3 || val === 4 || val === 5) ? 1 : 0,
+    left: (val === 5 || val === 6 || val === 7) ? 1 : 0,
+    neutral: 0
+  }
+  return dirs
+}
+
 function startInputLoggerForDevice(d, parsed) {
   correctControls()
   const prefix = jsPrefixForDevice(d)
@@ -534,6 +565,17 @@ function startInputLoggerForDevice(d, parsed) {
   const rotArmed = new Map() // outKey -> boolean
   const rotHome = new Map()  // outKey -> learned center value at rest (from warmup)
 
+  // Hat tracking for virtual buttons (per hat name)
+  const hatLastDirs = new Map() // hatOutPrefix -> {up,right,down,left,neutral}
+
+  // NEW: track which axes actually move during warmup so vendor "dead" axes (like VKB y/z) can be ignored
+  const axisMin = new Map() // outKey -> min observed
+  const axisMax = new Map() // outKey -> max observed
+  const axisSeen = new Map() // outKey -> samples
+  const axisUsable = new Map() // outKey -> boolean
+  const WARMUP_SAMPLES = 25
+  const WARMUP_EPS = 16 // tweak if needed per device resolution
+
   // suppress repeats if the exact same control was the last one reported
   let lastReported = ''
 
@@ -547,12 +589,14 @@ function startInputLoggerForDevice(d, parsed) {
 
   // ------------------------------------------------------------
   // SINGLE-AXIS EXCEPTION:
-  // If this device only has 1 axis total, allow repeating that axis
+  // If this device only has 1 axis total (excluding hats), allow repeating that axis
   // even if it was the lastReported control.
   // ------------------------------------------------------------
   const axisNames = new Set()
   for (const list of parsed.axesByReport.values()) {
-    for (const a of list) axisNames.add(a.name)
+    for (const a of list) {
+      if (!isHatAxis(a.usagePage, a.usage, a.name)) axisNames.add(a.name)
+    }
   }
   const isSingleAxisDevice = axisNames.size === 1
   const singleAxisOutKey = isSingleAxisDevice
@@ -621,10 +665,31 @@ function startInputLoggerForDevice(d, parsed) {
         axisActive.set(outKey, false)
         axisLastEmit.set(outKey, 0)
 
+        // init hat virtual directions (and don't treat hat as analog axis)
+        if (isHatAxis(a.usagePage, a.usage, a.name)) {
+          const hatBase = `${prefix}${a.name}` // ✅ js1_hat1 (no duplication)
+          hatLastDirs.set(hatBase, hatValueToDirs(val))
+          continue
+        }
+
         // learn rotx/roty "home" (resting center) from warmup value
         if (a.name === 'rotx' || a.name === 'roty') {
           rotHome.set(outKey, val)
           rotArmed.set(outKey, true)
+        }
+
+        // track usability of axes (some vendors expose x/y/z but only one ever moves)
+        const min0 = axisMin.get(outKey)
+        const max0 = axisMax.get(outKey)
+        axisMin.set(outKey, (min0 == null) ? val : Math.min(min0, val))
+        axisMax.set(outKey, (max0 == null) ? val : Math.max(max0, val))
+        axisSeen.set(outKey, (axisSeen.get(outKey) || 0) + 1)
+
+        if ((axisSeen.get(outKey) || 0) >= WARMUP_SAMPLES) {
+          const mn = axisMin.get(outKey)
+          const mx = axisMax.get(outKey)
+          const span = Math.abs((mx ?? 0) - (mn ?? 0))
+          axisUsable.set(outKey, span > WARMUP_EPS)
         }
       }
 
@@ -662,7 +727,7 @@ function startInputLoggerForDevice(d, parsed) {
       lastButtons.set(key, down)
     }
 
-    // Axes
+    // Axes (including hats, but hats are handled as POV -> virtual buttons)
     for (const a of axes) {
       const out = `${prefix}axis_${a.name}`
 
@@ -670,12 +735,42 @@ function startInputLoggerForDevice(d, parsed) {
       let val = rawU
       if (a.logicalMin < 0) val = toSigned(rawU, a.bitSize)
 
-      // ✅ Hats are "axis-like" in HID, but they aren't analog axes.
-      // For now: do not run analog movement gating on hats (prevents false noise),
-      // but still allow them to be learned if you later want to map hat directions.
-      if (a.name === 'hat' || String(a.name).startsWith('hat')) {
+      // ✅ Hat Switch handling: emit virtual buttons instead of treating as analog axis
+      if (isHatAxis(a.usagePage, a.usage, a.name)) {
         axisLastVal.set(out, val)
         axisActive.set(out, false)
+
+        const hatBase = `${prefix}${a.name}` // ✅ js1_hat1
+        const prevDirs = hatLastDirs.get(hatBase) || { up: 0, right: 0, down: 0, left: 0, neutral: 1 }
+        const nowDirs = hatValueToDirs(val)
+
+        // emit only on transitions to pressed directions
+        const map = [
+          ['up', `${hatBase}_up`],
+          ['right', `${hatBase}_right`],
+          ['down', `${hatBase}_down`],
+          ['left', `${hatBase}_left`]
+        ]
+
+        for (const [k, outKey] of map) {
+          const was = prevDirs[k] === 1
+          const is = nowDirs[k] === 1
+          if (is && !was) {
+            lastButtonAt = Date.now()
+            if (reportOnce(outKey)) {
+              if (showConsoleMessages) console.log(outKey.blue)
+              logs_debug('[BRAIN]'.bgMagenta, 'input-detection'.cyan, outKey)
+              gatherAfterDeviceInputs(outKey, d)
+            }
+          }
+        }
+
+        hatLastDirs.set(hatBase, nowDirs)
+        continue
+      }
+
+      // ignore "dead" axes detected during warmup (common for VKB pedals showing x,y,z)
+      if (axisUsable.has(out) && axisUsable.get(out) === false) {
         continue
       }
 
@@ -787,11 +882,18 @@ function pidVidFromHidPath(path) {
 function gatherAfterDeviceInputs(data, d) {
   const joyInfo = data.split('_')
   let result
+
   if (joyInfo[1] == 'axis') {
     result = findKeybind(`${joyInfo[0]}_${joyInfo[2]}`, actionmaps.get('discoveredKeybinds'))
-  } else {
+  }
+  else if (String(joyInfo[1] || '').startsWith('hat')) {
+    // js1_hat1_up -> js1_hat1_up
+    result = findKeybind(`${joyInfo[0]}_${joyInfo[1]}_${joyInfo[2]}`, actionmaps.get('discoveredKeybinds'))
+  }
+  else {
     result = findKeybind(`${joyInfo[0]}_${joyInfo[1]}`, actionmaps.get('discoveredKeybinds'))
   }
+
   // console.log(d)
   const deviceSpecs = {
     key: pidVidFromHidPath(d.path),
@@ -866,7 +968,10 @@ function joySubmit(data) {
   // console.log("package:".yellow,package)
   blastToUI(package)
 }
+
 // Collect ALL buttons across all report IDs (instead of only report '1')
+// Optional: cap to avoid wild "range buttons" from vendors that declare 128+ but only a subset actually changes.
+// You can raise/lower this cap or remove it once you validate real button bits.
 function countAllButtonsFromPlain(parsedInputs) {
   const byRid = parsedInputs && parsedInputs.buttonsByReport ? parsedInputs.buttonsByReport : {}
   let count = 0
@@ -874,9 +979,15 @@ function countAllButtonsFromPlain(parsedInputs) {
     const arr = byRid[ridStr] || []
     count += arr.length
   }
+
+  const HARD_CAP = 128
+  if (count > HARD_CAP) count = HARD_CAP
+
   return count
 }
+
 // Collect ALL axes across all report IDs (instead of only report '1')
+// ✅ Exclude hats from axis list (they will be represented as POV/virtual buttons)
 function collectAllAxisNamesFromPlain(parsedInputs) {
   const byRid = parsedInputs && parsedInputs.axesByReport ? parsedInputs.axesByReport : {}
   const out = []
@@ -884,11 +995,13 @@ function collectAllAxisNamesFromPlain(parsedInputs) {
     const arr = byRid[ridStr] || []
     for (const a of arr) {
       if (!a || !a.name) continue
+      if (isHatAxis(a.usagePage, a.usage, a.name)) continue
       out.push(a.name)
     }
   }
   return out
 }
+
 async function main() {
   const devices = listAllJoysticks()
   if (!devices.length) {
@@ -989,12 +1102,25 @@ function initializeUI(data, receiver) {
           position: data[item].jsIndex,
           // ✅ count all reports, not just '1'
           buttons: countAllButtonsFromPlain(data[item].parsedInputs),
-          axes: []
+          axes: [],
+          hats: []
         }
       }
 
       // ✅ collect all report IDs, not just '1'
       package[prod].axes = collectAllAxisNamesFromPlain(parsed)
+
+      // expose hats separately so UI can show them distinctly
+      const byRid = parsed && parsed.axesByReport ? parsed.axesByReport : {}
+      const hats = new Set()
+      for (const ridStr of Object.keys(byRid)) {
+        const arr = byRid[ridStr] || []
+        for (const a of arr) {
+          if (!a || !a.name) continue
+          if (isHatAxis(a.usagePage, a.usage, a.name)) hats.add(a.name)
+        }
+      }
+      package[prod].hats = Array.from(hats)
     }
     let sortedPackage = Object.values(package)
       .sort((a, b) => a.position - b.position)
@@ -1031,12 +1157,24 @@ function setupUI(data, receiver) {
         position: data[item].jsIndex,
         // ✅ count all reports, not just '1'
         buttons: countAllButtonsFromPlain(parsed),
-        axes: []
+        axes: [],
+        hats: []
       }
     }
 
     // ✅ collect all report IDs, not just '1'
     byProd[prod].axes = collectAllAxisNamesFromPlain(parsed)
+
+    const byRid = parsed && parsed.axesByReport ? parsed.axesByReport : {}
+    const hats = new Set()
+    for (const ridStr of Object.keys(byRid)) {
+      const arr = byRid[ridStr] || []
+      for (const a of arr) {
+        if (!a || !a.name) continue
+        if (isHatAxis(a.usagePage, a.usage, a.name)) hats.add(a.name)
+      }
+    }
+    byProd[prod].hats = Array.from(hats)
   }
 
   const sortedPackage = Object.values(byProd).sort((a, b) => a.position - b.position)
