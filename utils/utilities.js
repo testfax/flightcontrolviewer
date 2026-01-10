@@ -8,7 +8,7 @@ const colors = require('colors')
 const windowItemsStore = new Store({ name: 'electronWindowIds'})
 const showConsoleMessages = windowItemsStore.get('showConsoleMessages')
 const xml2js = require('xml2js')
-
+const { execFileSync } = require('child_process')
 
 const util = { 
     formatJsonObject: function(obj, indent) {
@@ -309,7 +309,7 @@ const util = {
       return path.join(base, 'helpers', 'winhiddump', 'winhiddump.exe')
     },
     runWinHidDump: function() {
-        const { execFileSync } = require('child_process')
+        
         const exePath = util.getWinHidDumpPath()
         return execFileSync(exePath, [], { encoding: 'utf8', windowsHide: true })
     }
