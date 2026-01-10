@@ -332,13 +332,10 @@ try {
         },
         logs_debug: async (...input) => {
             // console.log("LOGS_DEBUG".bgCyan)
-            let logMessage = input.map(item => {
-                if (typeof item === 'object') {
-                    return colorizeJSON(JSON.stringify(item, null, 2));
-                } else {
-                    return item;
-                }
-            }).join(' ');
+            const logMessage = input.map(item => {
+                if (item && typeof item === 'object') return colorizeAny(item)
+                return item
+            }).join(' ')
             log.debug(logMessage)
         }
     };

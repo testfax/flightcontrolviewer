@@ -629,6 +629,7 @@ function startInputLoggerForDevice(d, parsed) {
         const out = `${prefix}button${b.usage}`
         if (reportOnce(out)) {
           if (showConsoleMessages) console.log(out.blue)
+          logs_debug('[BRAIN]'.bgMagenta, 'input-detection'.cyan, out)
           gatherAfterDeviceInputs(out, d)
         }
       }
@@ -706,11 +707,13 @@ function startInputLoggerForDevice(d, parsed) {
         if (!wasActive && isActive) {
           if (reportOnce(out)) {
             if (showConsoleMessages) console.log(out.cyan)
+            logs_debug('[BRAIN]'.bgMagenta, 'input-detection'.cyan, out)
           }
           axisLastEmit.set(out, now)
         } else if (movedEnough && (now - lastEmit) >= AXIS_COOLDOWN_MS) {
           if (reportOnce(out)) {
             if (showConsoleMessages) console.log(out.red)
+            logs_debug('[BRAIN]'.bgMagenta, 'input-detection'.cyan, out)
             gatherAfterDeviceInputs(out, d)
           }
 
@@ -796,7 +799,7 @@ function correctControls() {
         const deviceKey = Object.keys(devices)
           .find(k => k.includes(guid))
         if (!devices) {
-          console.log('[BRAIN]'.red, 'input-detection'.yellow, 'No devices ready...')
+          logs('[BRAIN]'.red, 'input-detection'.yellow, 'No devices ready...')
           blastToUI(package = {
             ...data = { message: "Input-Detection: No devices ready..." },
             ...{ receiver: "from_brain-detection" },

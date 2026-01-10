@@ -35,6 +35,20 @@ class Tooltip {
     this.tooltip.style.top = y + "px";
   }
 }
+function serializeError(e) {
+  if (!e) return { name: 'Error', message: 'Unknown error', stack: '' }
+
+  if (typeof e === 'string') {
+    return { name: 'Error', message: e, stack: '' }
+  }
+
+  return {
+    name: e.name || 'Error',
+    message: e.message || String(e),
+    stack: e.stack || '',
+    cause: e.cause ? serializeError(e.cause) : undefined
+  }
+}
 async function getEventFromStore(event) {
   try {
     let data = await window.eliteEvent.multiStores

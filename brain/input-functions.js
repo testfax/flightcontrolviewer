@@ -207,20 +207,28 @@ try {
                 logs_error("[ERROR]".red,error.stack)
             }
         },
+        blastToLogger: function(package) {
+            let logs = viewerLogs.get('log')
+    
+            if (!Array.isArray(logs)) {
+            logs = []
+            }
+    
+            logs.push(package?.message ?? package)
+            viewerLogs.set('log', logs)
+        },
         blastToUI: function (package) {
             if (!client) {
                 console.log('no client')
                 return
             }
-
             client.webContents.send(package.receiver, package)
-
             let logs = viewerLogs.get('log')
-
+    
             if (!Array.isArray(logs)) {
             logs = []
             }
-
+    
             logs.push(package?.message ?? package)
             viewerLogs.set('log', logs)
         },

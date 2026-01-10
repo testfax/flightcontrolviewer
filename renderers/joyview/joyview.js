@@ -216,20 +216,7 @@ try {
 
     box.innerText = lines.join('\n').trim()
   }
-  function serializeError(e) {
-    if (!e) return { name: 'Error', message: 'Unknown error', stack: '' }
 
-    if (typeof e === 'string') {
-      return { name: 'Error', message: e, stack: '' }
-    }
-
-    return {
-      name: e.name || 'Error',
-      message: e.message || String(e),
-      stack: e.stack || '',
-      cause: e.cause ? serializeError(e.cause) : undefined
-    }
-  }
   // ============================================================
   // LAYOUT STATE / LAYOUT FETCH (unchanged)
   // ============================================================
@@ -513,7 +500,6 @@ try {
                 if (cat) {screenReady += `${cat}\n`}
                 else {
                   screenReady += `${package.detection} CAT: ${category}\n`
-                  translateIssues["category"] = category
                 }
 
                 groupedActions[category].forEach(action => {
@@ -521,6 +507,7 @@ try {
                   if (act) {screenReady += `-> ${act}\n`}
                   else {
                     screenReady += `- ! ! ! ACTION ! ! !: ${action}\n`
+                    translateIssues["category"] = category
                     translateIssues["action"] = action
                   }
                 })
