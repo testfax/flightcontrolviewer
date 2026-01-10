@@ -154,19 +154,23 @@ const util = {
             win.setTitle(`Flight Control Viewer - ${app.getVersion()} up to date...`)
         })
 
-        autoUpdater.on('download-progress', p => {
-            const formatted = (p.percent / 100).toLocaleString(undefined, {
-            style: 'percent',
-            minimumFractionDigits: 1
-            })
-            win.setTitle(`Flight Control Viewer - ${app.getVersion()} Downloading update ${formatted}`)
+        // autoUpdater.on('download-progress', p => {
+        //     const formatted = (p.percent / 100).toLocaleString(undefined, {
+        //     style: 'percent',
+        //     minimumFractionDigits: 1
+        //     })
+        //     win.setTitle(`Flight Control Viewer - ${app.getVersion()} Downloading update ${formatted}`)
+        // })
+        autoUpdater.on('download-progress', (progressObj) => {
+            const thisPercent = progressObj.percent / 100
+            const formattedNumber = (thisPercent).toLocaleString(undefined, { style: 'percent', minimumFractionDigits:1});
+            win.setTitle(`Flight Control Viewer - ${JSON.stringify(app.getVersion())} Downloading New Update ${formattedNumber}`)
         })
 
         autoUpdater.on('error', err => {
             logs_error('[AU] error', err && err.stack ? err.stack : err)
             win.setTitle(`Flight Control Viewer - ${app.getVersion()} Update error (see logs)`)
         })
-
         autoUpdater.on('update-downloaded', async () => {
             const result = await dialog.showMessageBox(win, {
             type: 'info',

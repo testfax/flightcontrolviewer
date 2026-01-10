@@ -950,6 +950,10 @@ function setupUI(data, receiver) {
 
   blastToUI(pkg)
   logs_warn(pkg)
+  init = 0
+  const package = { receiver: "from_brain-detection-ready", data: 1 }
+  blastToUI(package)
+  console.log('=== Ready to Receive Inputs ==='.green)
 }
 function resolveLayoutsDir(app, path) {
   return path.join(app.getAppPath(), 'layouts')
@@ -1063,12 +1067,12 @@ ipcMain.on('setupPage', async (receivedData) => {
       init = 1
       page = 'setup'
       main()
-      setTimeout(() => {
-        init = 0
-        const package = { receiver: "from_brain-detection-ready", data: 1 }
-        blastToUI(package)
-        console.log('=== Ready to Receive Inputs ==='.green)
-      }, 2000)
+      // setTimeout(() => {
+      //   init = 0
+      //   const package = { receiver: "from_brain-detection-ready", data: 1 }
+      //   blastToUI(package)
+      //   console.log('=== Ready to Receive Inputs ==='.green)
+      // }, 2000)
   },1000)
 })
 ipcMain.on('changePage', async (receivedData) => {

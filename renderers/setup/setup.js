@@ -109,7 +109,7 @@ try {
   ipcRenderer.on('from_brain-detection-ready', async package => {
     const thisDeviceEl = document.getElementById('thisDevice')
         if (thisDeviceEl) {
-          thisDeviceEl.innerText = ""
+          thisDeviceEl.innerText = "Devices Shown Below"
         }
   })
   ipcRenderer.on('from_brain-detection', package => {
