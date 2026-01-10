@@ -20,7 +20,8 @@
     "asar": false,
 
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/fcv.ico"
     },
 
     "linux": {
