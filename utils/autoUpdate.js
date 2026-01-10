@@ -1,6 +1,7 @@
-const {app} = require('electron')
 const {logs,logs_error} = require('./logConfig')
-const {watcherConsoleDisplay,errorHandler,logF} = require('./utilities')
+const {app} = require('electron')
+const Store = require('electron-store').default
+ const store = new Store({ name: "electronWindowIds" })
 const win = store.get('electronWindowIds')
 const { autoUpdater } = require('electron-updater')
 

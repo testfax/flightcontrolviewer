@@ -122,60 +122,119 @@ const util = {
     },
     cwd: app.isPackaged ? path.join(process.cwd(),'resources','app') : process.cwd(),
     autoUpdater: async () => {
-        // Auto Updater
-        if (app.isPackaged) { 
-            const win = BrowserWindow.fromId(1)
-            const { autoUpdater } = require('electron-updater')
-            logs_debug("Running Auto-Updater Functions".yellow)
-            autoUpdater.logger = require('electron-log')
-            autoUpdater.checkForUpdatesAndNotify();
+        if (!app.isPackaged) return
 
-            // autoUpdater.logger.transports.file.level = 'info';
-            // autoUpdater.autoDownload = true
-            // autoUpdater.autoInstallOnAppQuit = true
-            autoUpdater.on('download-progress', (progressObj) => {
-                const thisPercent = progressObj.percent / 100
-                const formattedNumber = (thisPercent).toLocaleString(undefined, { style: 'percent', minimumFractionDigits:1});
-                    win.setTitle(`Flight Control Viewer - ${JSON.stringify(app.getVersion())} Downloading New Update ${formattedNumber}`)
-                })
-                autoUpdater.on('error',(error)=>{ 
+        const { BrowserWindow, dialog } = require('electron')
+        const { autoUpdater } = require('electron-updater')
 
-                })
-                autoUpdater.on('checking-for-update', (info)=>{
-                    if (!info) { 
-                        win.setTitle(`Flight Control Viewer - ${JSON.stringify(app.getVersion())} Checking for Updates "NONE"`) }
-                    else {
-                    win.setTitle(`Flight Control Viewer - ${JSON.stringify(app.getVersion())} Checking for Updates ${info}`)
-                    }
-                })
-                autoUpdater.on('update-available',(info)=>{
-                    win.setTitle(`Flight Control Viewer - ${JSON.stringify(app.getVersion())} - ${JSON.stringify(info.version)} Update Available, download pending... please wait...`)
-                })
-                autoUpdater.on('update-not-available',(info)=>{
-                    // logs_debug(`-AU update-not-available: ${JSON.stringify(info)}`)
-                })
-                autoUpdater.on('update-downloaded',(info)=>{
-                dialog.showMessageBox({
-                    type: 'info',
-                    title: 'Update Available',
-                    message: 'A new version of the app is available. App will now automatically install and restart once completed.',
-                    buttons: ['Continue']
-                }).then((result) => {
-                    if (result.response === 0) {
-                    // User chose to install now, quit the app and install the update.
-                    // const appDataFolderPath = path.join(process.env.APPDATA, 'elitepilotslounge');
-                    // //Removes the roaming folder for a clean install.
-                    // //Have seen users not be able to load the program, due to corrupted roaming/elitepilotslounge.
-                    // if (fs.existsSync(appDataFolderPath)) {
-                    //   console.log(appDataFolderPath)
-                    //   fs.rmdirSync(appDataFolderPath, { recursive: true });
-                    // }
-                    autoUpdater.quitAndInstall();
-                    }
-                });
-            })
+        // Prefer the existing window reference if you have it.
+        // Fallback: first window.
+        const win = BrowserWindow.getAllWindows()[0] || BrowserWindow.fromId(BrowserWindow.getFocusedWindow()?.id)
+
+        if (!win) {
+            logs_error('[AU] No window available to setTitle on')
+            return
         }
+
+        // Prevent duplicate listener stacking if this function can run again
+        autoUpdater.removeAllListeners()
+
+        logs_debug('[AU] Running Auto-Updater Functions'.yellow)
+        autoUpdater.logger = require('electron-log')
+
+        autoUpdater.on('checking-for-update', () => {
+            win.setTitle(`Flight Control Viewer - ${app.getVersion()} Checking for updates...`)
+        })
+
+        autoUpdater.on('update-available', info => {
+            win.setTitle(`Flight Control Viewer - ${app.getVersion()} - ${info.version} Update available, downloading...`)
+        })
+
+        autoUpdater.on('update-not-available', () => {
+            // optional
+        })
+
+        autoUpdater.on('download-progress', p => {
+            const formatted = (p.percent / 100).toLocaleString(undefined, {
+            style: 'percent',
+            minimumFractionDigits: 1
+            })
+            win.setTitle(`Flight Control Viewer - ${app.getVersion()} Downloading update ${formatted}`)
+        })
+
+        autoUpdater.on('error', err => {
+            logs_error('[AU] error', err && err.stack ? err.stack : err)
+            win.setTitle(`Flight Control Viewer - ${app.getVersion()} Update error (see logs)`)
+        })
+
+        autoUpdater.on('update-downloaded', async () => {
+            const result = await dialog.showMessageBox(win, {
+            type: 'info',
+            title: 'Update Available',
+            message: 'A new version is ready. The app will now install and restart.',
+            buttons: ['Continue']
+            })
+            if (result.response === 0) autoUpdater.quitAndInstall()
+        })
+
+        // Now start the check AFTER listeners are attached
+        await autoUpdater.checkForUpdatesAndNotify()
     },
+    // autoUpdater: async () => {
+    //     // Auto Updater
+    //     if (app.isPackaged) { 
+    //         const win = BrowserWindow.fromId(1)
+    //         const { autoUpdater } = require('electron-updater')
+    //         logs_debug("Running Auto-Updater Functions".yellow)
+    //         autoUpdater.logger = require('electron-log')
+    //         autoUpdater.checkForUpdatesAndNotify();
+
+    //         // autoUpdater.logger.transports.file.level = 'info';
+    //         // autoUpdater.autoDownload = true
+    //         // autoUpdater.autoInstallOnAppQuit = true
+    //         autoUpdater.on('download-progress', (progressObj) => {
+    //             const thisPercent = progressObj.percent / 100
+    //             const formattedNumber = (thisPercent).toLocaleString(undefined, { style: 'percent', minimumFractionDigits:1});
+    //                 win.setTitle(`Flight Control Viewer - ${JSON.stringify(app.getVersion())} Downloading New Update ${formattedNumber}`)
+    //             })
+    //             autoUpdater.on('error',(error)=>{ 
+
+    //             })
+    //             autoUpdater.on('checking-for-update', (info)=>{
+    //                 if (!info) { 
+    //                     win.setTitle(`Flight Control Viewer - ${JSON.stringify(app.getVersion())} Checking for Updates "NONE"`) }
+    //                 else {
+    //                 win.setTitle(`Flight Control Viewer - ${JSON.stringify(app.getVersion())} Checking for Updates ${info}`)
+    //                 }
+    //             })
+    //             autoUpdater.on('update-available',(info)=>{
+    //                 win.setTitle(`Flight Control Viewer - ${JSON.stringify(app.getVersion())} - ${JSON.stringify(info.version)} Update Available, download pending... please wait...`)
+    //             })
+    //             autoUpdater.on('update-not-available',(info)=>{
+    //                 // logs_debug(`-AU update-not-available: ${JSON.stringify(info)}`)
+    //             })
+    //             autoUpdater.on('update-downloaded',(info)=>{
+    //             dialog.showMessageBox({
+    //                 type: 'info',
+    //                 title: 'Update Available',
+    //                 message: 'A new version of the app is available. App will now automatically install and restart once completed.',
+    //                 buttons: ['Continue']
+    //             }).then((result) => {
+    //                 if (result.response === 0) {
+    //                 // User chose to install now, quit the app and install the update.
+    //                 // const appDataFolderPath = path.join(process.env.APPDATA, 'elitepilotslounge');
+    //                 // //Removes the roaming folder for a clean install.
+    //                 // //Have seen users not be able to load the program, due to corrupted roaming/elitepilotslounge.
+    //                 // if (fs.existsSync(appDataFolderPath)) {
+    //                 //   console.log(appDataFolderPath)
+    //                 //   fs.rmdirSync(appDataFolderPath, { recursive: true });
+    //                 // }
+    //                 autoUpdater.quitAndInstall();
+    //                 }
+    //             });
+    //         })
+    //     }
+    // },
     windowPosition: function(win,init) {
         
         //Since the intent is to get the window Size and Position, lets call the function that validates the path of the lounge-client.json
