@@ -151,7 +151,7 @@ const util = {
         })
 
         autoUpdater.on('update-not-available', () => {
-            // optional
+            win.setTitle(`Flight Control Viewer - ${app.getVersion()} up to date...`)
         })
 
         autoUpdater.on('download-progress', p => {
