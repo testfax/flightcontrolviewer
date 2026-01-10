@@ -194,12 +194,30 @@ function usageName(usagePage, usage) {
       case 0x36: return 'slider'
       case 0x37: return 'dial'
       case 0x38: return 'wheel'
+      case 0x39: return 'hat' // ✅ Generic Desktop 0x39 = Hat Switch (POV)
       default: return `gd_${usage.toString(16)}`
     }
   }
   if (usagePage === 0x02) return `sim_${usage.toString(16)}`
   return `up${usagePage.toString(16)}_${usage.toString(16)}`
 }
+
+// Filter out "junk axes" that show up as variable inputs but are not meaningful controls
+function shouldKeepAxis(usagePage, usage, bitSize, logicalMin, logicalMax) {
+  // undefined / unknown usage almost always means "not a real axis" for our UI
+  if (usagePage === 0 || usage === 0) return false
+
+  // 1-bit "axis" is almost always a button/flag that got described outside Button page
+  if (bitSize === 1) return false
+
+  if (bitSize <= 0 || bitSize > 31) return false
+
+  // if the descriptor claims no meaningful range, it's usually padding/constant-ish
+  if (typeof logicalMin === 'number' && typeof logicalMax === 'number' && logicalMin === logicalMax) return false
+
+  return true
+}
+
 // ---------- Parse descriptor -> buttons + axes ----------
 function parseInputsFromReportDescriptor(descBuf) {
   const state = {
@@ -246,12 +264,28 @@ function parseInputsFromReportDescriptor(descBuf) {
     buttonsByReport.get(rid).push({ usage, bitOffset, bitSize })
   }
 
+  // Ensure axis "name" is unique per report to avoid collisions in runtime maps
+  function uniqueAxisNameForReport(rid, baseName) {
+    const arr = axesByReport.get(rid) || []
+    let name = baseName
+    let n = 2
+    while (arr.some(x => x && x.name === name)) {
+      name = `${baseName}${n}`
+      n += 1
+    }
+    return name
+  }
+
   function addAxis(rid, usagePage, usage, bitOffset, bitSize, logicalMin, logicalMax) {
     if (!axesByReport.has(rid)) axesByReport.set(rid, [])
+
+    const baseName = usageName(usagePage, usage)
+    const name = uniqueAxisNameForReport(rid, baseName)
+
     axesByReport.get(rid).push({
       usagePage,
       usage,
-      name: usageName(usagePage, usage),
+      name,
       bitOffset,
       bitSize,
       logicalMin,
@@ -335,6 +369,10 @@ function parseInputsFromReportDescriptor(descBuf) {
           for (let idx = 0; idx < count; idx += 1) {
             const usage = fieldUsages[idx]
             if (usage == null) continue
+
+            // ✅ Drop junk "axes" (like up0_0) and 1-bit flags masquerading as axes
+            if (!shouldKeepAxis(state.usagePage, usage, sizeBits, state.logicalMin, state.logicalMax)) continue
+
             addAxis(rid, state.usagePage, usage, startBit + (idx * sizeBits), sizeBits, state.logicalMin, state.logicalMax)
           }
         }
@@ -463,9 +501,9 @@ function learnAndPersistDevice(d, dumpText) {
   if (showConsoleMessages) { console.log('Learned Device:'.cyan, devices[key].product) }
   logs('[BRAIN]'.bgCyan, 'input-detection'.yellow, 'Learned Device:'.cyan, devices[key].product)
   blastToUI(package = {
-    ...data = { message: `Input-Detection: Learned Device: ${devices[key].product}` }, 
-    ...{receiver: "from_brain-detection"},
-  }) 
+    ...data = { message: `Input-Detection: Learned Device: ${devices[key].product}` },
+    ...{ receiver: "from_brain-detection" },
+  })
   setDevicesStore(devices)
   return parsed
 }
@@ -570,9 +608,9 @@ function startInputLoggerForDevice(d, parsed) {
         if (showConsoleMessages) console.log(prefix + `axes_rid${rid}=` + names, 'loaded'.green)
         logs('[BRAIN]'.bgCyan, 'input-detection'.yellow, prefix + `axes_rid${rid}=` + names, 'loaded'.green)
         blastToUI(package = {
-          ...data = { message: `Input-Detection: ${prefix} + axes_rid${rid}=${names}, 'loaded'` }, 
-          ...{receiver: "from_brain-detection"},
-        }) 
+          ...data = { message: `Input-Detection: ${prefix} + axes_rid${rid}=${names}, 'loaded'` },
+          ...{ receiver: "from_brain-detection" },
+        })
       }
 
       warmed.add(rid)
@@ -605,6 +643,15 @@ function startInputLoggerForDevice(d, parsed) {
       const rawU = readBitsAsUnsignedLE(payload, a.bitOffset, a.bitSize)
       let val = rawU
       if (a.logicalMin < 0) val = toSigned(rawU, a.bitSize)
+
+      // ✅ Hats are "axis-like" in HID, but they aren't analog axes.
+      // For now: do not run analog movement gating on hats (prevents false noise),
+      // but still allow them to be learned if you later want to map hat directions.
+      if (a.name === 'hat' || String(a.name).startsWith('hat')) {
+        axisLastVal.set(out, val)
+        axisActive.set(out, false)
+        continue
+      }
 
       const cfg = computeAxisCenterAndThreshold(a, CENTER_PERCENT)
       const centerDelta = Math.abs(val - cfg.center)
@@ -709,7 +756,7 @@ function pidVidFromHidPath(path) {
   const [, vid, pid] = match
   return `${vid.toUpperCase()}:${pid.toUpperCase()}`
 }
-function gatherAfterDeviceInputs(data,d) {
+function gatherAfterDeviceInputs(data, d) {
   const joyInfo = data.split('_')
   let result
   if (joyInfo[1] == 'axis') {
@@ -748,13 +795,13 @@ function correctControls() {
 
         const deviceKey = Object.keys(devices)
           .find(k => k.includes(guid))
-        if (!devices) { 
+        if (!devices) {
           console.log('[BRAIN]'.red, 'input-detection'.yellow, 'No devices ready...')
           blastToUI(package = {
-            ...data = { message: "Input-Detection: No devices ready..." }, 
-            ...{receiver: "from_brain-detection"},
-          }) 
-          return 
+            ...data = { message: "Input-Detection: No devices ready..." },
+            ...{ receiver: "from_brain-detection" },
+          })
+          return
         }
         if (!deviceKey || !devices[deviceKey].savedAt) continue
 
@@ -785,21 +832,47 @@ function joySubmit(data) {
   if (showConsoleMessages) { console.log(data) }
   let package = {}
   package = {
-    ...data, 
-    ...{receiver: "from_brain-detection"},
+    ...data,
+    ...{ receiver: "from_brain-detection" },
   }
   // console.log("package:".yellow,package)
   blastToUI(package)
 }
+
+// Collect ALL buttons across all report IDs (instead of only report '1')
+function countAllButtonsFromPlain(parsedInputs) {
+  const byRid = parsedInputs && parsedInputs.buttonsByReport ? parsedInputs.buttonsByReport : {}
+  let count = 0
+  for (const ridStr of Object.keys(byRid)) {
+    const arr = byRid[ridStr] || []
+    count += arr.length
+  }
+  return count
+}
+
+// Collect ALL axes across all report IDs (instead of only report '1')
+function collectAllAxisNamesFromPlain(parsedInputs) {
+  const byRid = parsedInputs && parsedInputs.axesByReport ? parsedInputs.axesByReport : {}
+  const out = []
+  for (const ridStr of Object.keys(byRid)) {
+    const arr = byRid[ridStr] || []
+    for (const a of arr) {
+      if (!a || !a.name) continue
+      out.push(a.name)
+    }
+  }
+  return out
+}
+
 async function main() {
   const devices = listAllJoysticks()
   if (!devices.length) {
     console.log('[input-detection] No joystick-class devices found (usagePage=1 usage=4)')
     logs('[BRAIN]'.bgCyan, 'input-detection'.yellow, '[input-detection] No joystick-class devices found (usagePage=1 usage=4)'.yellow)
     blastToUI(package = {
-      ...data = { message: `Input-Detection: No joystick-class devices found (usagePage=1 usage=4)` }, 
-      ...{receiver: "from_brain-detection"},
-    })  
+      ...data = { message: `Input-Detection: No joystick-class devices found (usagePage=1 usage=4)` },
+      ...{ receiver: "from_brain-detection" },
+    })
     return
   }
 
@@ -815,13 +888,6 @@ async function main() {
     const entry = stored[key]
 
     if (entry && entry.parsedInputs) {
-      // for (const reportId in entry.parsedInputs.axesByReport) {
-      //   entry.parsedInputs.axesByReport[reportId] = entry.parsedInputs.axesByReport[reportId].map(axis => {
-      //     if (axis.name === 'rx') axis.name = 'rotx'
-      //     else if (axis.name === 'ry') axis.name = 'roty'
-      //     return axis
-      //   })
-      // }
       if (entry.path !== d.path) {
         entry.path = d.path
         entry.savedAt = Math.floor(Date.now() / 1000)
@@ -838,9 +904,9 @@ async function main() {
       if (showConsoleMessages) { console.log(prefix + 'unlearned_no_dump') }
       logs('[BRAIN]'.bgCyan, 'input-detection'.yellow, prefix + 'unlearned_no_dump'.red)
       blastToUI(package = {
-        ...data = { message: `Input-Detection: ${prefix}unlearned_no_dump` }, 
-        ...{receiver: "from_brain-detection"},
-      })  
+        ...data = { message: `Input-Detection: ${prefix}unlearned_no_dump` },
+        ...{ receiver: "from_brain-detection" },
+      })
       continue
     }
 
@@ -853,9 +919,9 @@ async function main() {
       if (showConsoleMessages) { console.log(prefix + `learn_attempt_${tries}`.yellow) }
       logs('[BRAIN]'.bgCyan, 'input-detection'.yellow, prefix + `learn_attempt_${tries}`.yellow)
       blastToUI(package = {
-        ...data = { message: `Input-Detection: ${prefix}learn_attempt_${tries}` }, 
-        ...{receiver: "from_brain-detection"},
-      }) 
+        ...data = { message: `Input-Detection: ${prefix}learn_attempt_${tries}` },
+        ...{ receiver: "from_brain-detection" },
+      })
       learned = learnAndPersistDevice(d, dumpText)
       if (!learned && tries < 5) {
         await sleep(1000)
@@ -866,9 +932,9 @@ async function main() {
       if (showConsoleMessages) { console.log(prefix + `unlearned_descriptor_failed_after_${tries}_tries`.red) }
       logs('[BRAIN]'.bgCyan, 'input-detection'.yellow, `unlearned_descriptor_failed_after_${tries}_tries`.red)
       blastToUI(package = {
-        ...data = { message: `Input-Detection: unlearned_descriptor_failed_after_${tries}_tries` }, 
-        ...{receiver: "from_brain-detection"},
-      }) 
+        ...data = { message: `Input-Detection: unlearned_descriptor_failed_after_${tries}_tries` },
+        ...{ receiver: "from_brain-detection" },
+      })
       continue
     }
 
@@ -876,8 +942,10 @@ async function main() {
 
     if (page == 'joyview') startInputLoggerForDevice(d, learned)
   }
-  if (page = 'joyview') { initializeUI(getDevicesStore(),"from_brain-detection-initialize") }
-  if (page = 'setup') { setupUI(getDevicesStore(),"from_brain-detection") }
+
+  // ✅ fix accidental assignment (=) -> comparison (==)
+  if (page == 'joyview') { initializeUI(getDevicesStore(), "from_brain-detection-initialize") }
+  if (page == 'setup') { setupUI(getDevicesStore(), "from_brain-detection") }
 }
 function initializeUI(data, receiver) {
   if (windowItemsStore.get('currentPage') == 'dashboard' || windowItemsStore.get('currentPage') == 'joyview') {
@@ -894,19 +962,19 @@ function initializeUI(data, receiver) {
           pid: data[item].productId,
           prefix: data[item].prefix.split("_")[0],
           position: data[item].jsIndex,
-          buttons:  data[item].parsedInputs.buttonsByReport['1']?.length || 0,
+          // ✅ count all reports, not just '1'
+          buttons: countAllButtonsFromPlain(data[item].parsedInputs),
           axes: []
         }
       }
-      const axesArr = parsed.axesByReport?.['1'] || []
-      package[prod].axes = axesArr.map(a => a.name)
+
+      // ✅ collect all report IDs, not just '1'
+      package[prod].axes = collectAllAxisNamesFromPlain(parsed)
     }
     let sortedPackage = Object.values(package)
       .sort((a, b) => a.position - b.position)
     sortedPackage['receiver'] = receiver
     sortedPackage = { ...sortedPackage, ...devMode }
-
-    // console.log("SortedPackage",sortedPackage)
 
     blastToUI(sortedPackage)
     logs_warn(sortedPackage)
@@ -931,13 +999,14 @@ function setupUI(data, receiver) {
         pid: data[item].productId,
         prefix: String(data[item].prefix).split('_')[0],
         position: data[item].jsIndex,
-        buttons: parsed?.buttonsByReport?.['1']?.length || 0,
+        // ✅ count all reports, not just '1'
+        buttons: countAllButtonsFromPlain(parsed),
         axes: []
       }
     }
 
-    const axesArr = parsed?.axesByReport?.['1'] || []
-    byProd[prod].axes = axesArr.map(a => a.name)
+    // ✅ collect all report IDs, not just '1'
+    byProd[prod].axes = collectAllAxisNamesFromPlain(parsed)
   }
 
   const sortedPackage = Object.values(byProd).sort((a, b) => a.position - b.position)
@@ -966,10 +1035,10 @@ setTimeout(() => {
   main()
 }, 250)
 setTimeout(() => {
-    init = 0
-    const package = { receiver: "from_brain-detection-ready", data: 1 }
-    blastToUI(package)
-    logs('=== Ready to Receive Inputs ==='.green)
+  init = 0
+  const package = { receiver: "from_brain-detection-ready", data: 1 }
+  blastToUI(package)
+  logs('=== Ready to Receive Inputs ==='.green)
 }, 2000)
 
 //#############################
@@ -1041,91 +1110,85 @@ ipcMain.handle('joyview:get-layout', async (event, { vidPidKey }) => {
 })
 ipcMain.on('setupPage', async (receivedData) => {
   setTimeout(() => {
-      if (showConsoleMessages) { logs_debug("[RENDERER]".bgGreen,"Page Change:".yellow,windowItemsStore.get('currentPage')) }
-      //get HID data dump
-      try {
-        const dumpText = runWinHidDump()
-        deviceInfo.set('hidDescriptorDump', dumpText)
-        deviceInfo.set('hidDescriptorDumpStatus', {
-          ok: 1,
-          exePath: getWinHidDumpPath(),
-          length: dumpText.length,
-          time: Date.now()
-        })
-        logs('[HID]'.bgCyan, 'win-hid-dump OK'.green, `len=${dumpText.length}`.magenta)
-      } 
-      catch (e) {
-        deviceInfo.set('hidDescriptorDump', '')
-        deviceInfo.set('hidDescriptorDumpStatus', {
-          ok: 0,
-          exePath: getWinHidDumpPath(),
-          err: String(e && e.message ? e.message : e),
-          time: Date.now()
-        })
-        logs_error('[HID] win-hid-dump FAILED'.red, getWinHidDumpPath(), e && e.stack ? e.stack : e)
-      }
-      init = 1
-      page = 'setup'
-      main()
-      // setTimeout(() => {
-      //   init = 0
-      //   const package = { receiver: "from_brain-detection-ready", data: 1 }
-      //   blastToUI(package)
-      //   console.log('=== Ready to Receive Inputs ==='.green)
-      // }, 2000)
-  },1000)
+    if (showConsoleMessages) { logs_debug("[RENDERER]".bgGreen, "Page Change:".yellow, windowItemsStore.get('currentPage')) }
+    //get HID data dump
+    try {
+      const dumpText = runWinHidDump()
+      deviceInfo.set('hidDescriptorDump', dumpText)
+      deviceInfo.set('hidDescriptorDumpStatus', {
+        ok: 1,
+        exePath: getWinHidDumpPath(),
+        length: dumpText.length,
+        time: Date.now()
+      })
+      logs('[HID]'.bgCyan, 'win-hid-dump OK'.green, `len=${dumpText.length}`.magenta)
+    }
+    catch (e) {
+      deviceInfo.set('hidDescriptorDump', '')
+      deviceInfo.set('hidDescriptorDumpStatus', {
+        ok: 0,
+        exePath: getWinHidDumpPath(),
+        err: String(e && e.message ? e.message : e),
+        time: Date.now()
+      })
+      logs_error('[HID] win-hid-dump FAILED'.red, getWinHidDumpPath(), e && e.stack ? e.stack : e)
+    }
+    init = 1
+    page = 'setup'
+    main()
+  }, 1000)
 })
 ipcMain.on('changePage', async (receivedData) => {
   setTimeout(() => {
-      if (showConsoleMessages) { logs_debug("[RENDERER]".bgGreen,"Page Change:".yellow,windowItemsStore.get('currentPage')) }
-      init = 1
-      page = 'joyview'
-      try {
-        const filesToDelete = [
-            'viewerLogs.json',
-        ]
-        deleteAppJsonFiles(filesToDelete)
-        function deleteAppJsonFiles(filesToDelete) {
-            const userDataPath = app.getPath('userData')
-            
-            for (const file of filesToDelete) {
-                const fullPath = path.join(userDataPath, file)
-                try {
-                    if (fs.existsSync(fullPath)) {
-                        fs.rmSync(fullPath, { recursive: true, force: true })
-                        logs_debug("[APP]".bgMagenta,`Deleted Local JSON files: ${fullPath}`.green)
-                    }
-                } 
-                catch (err) {
-                    logs_error("[APP]".bgMagenta,`Failed to delete Local JSON files: ${fullPath}`, err)
-                }
+    if (showConsoleMessages) { logs_debug("[RENDERER]".bgGreen, "Page Change:".yellow, windowItemsStore.get('currentPage')) }
+    init = 1
+    page = 'joyview'
+    try {
+      const filesToDelete = [
+        'viewerLogs.json',
+      ]
+      deleteAppJsonFiles(filesToDelete)
+      function deleteAppJsonFiles(filesToDelete) {
+        const userDataPath = app.getPath('userData')
+
+        for (const file of filesToDelete) {
+          const fullPath = path.join(userDataPath, file)
+          try {
+            if (fs.existsSync(fullPath)) {
+              fs.rmSync(fullPath, { recursive: true, force: true })
+              logs_debug("[APP]".bgMagenta, `Deleted Local JSON files: ${fullPath}`.green)
             }
-            // if (app.isPackaged) restartApp()
+          }
+          catch (err) {
+            logs_error("[APP]".bgMagenta, `Failed to delete Local JSON files: ${fullPath}`, err)
+          }
         }
-      } 
-      catch (error) {
-        logs_error(error.stack)
+        // if (app.isPackaged) restartApp()
       }
-      initializeUI(getDevicesStore(),"from_brain-detection-initialize")
+    }
+    catch (error) {
+      logs_error(error.stack)
+    }
+    initializeUI(getDevicesStore(), "from_brain-detection-initialize")
 
-      setTimeout(() => {
-        init = 0
-        const package = { receiver: "from_brain-detection-ready", data: 1 }
-        blastToUI(package)
-        console.log('=== Ready to Receive Inputs ==='.green)
-      }, 2000)
+    setTimeout(() => {
+      init = 0
+      const package = { receiver: "from_brain-detection-ready", data: 1 }
+      blastToUI(package)
+      console.log('=== Ready to Receive Inputs ==='.green)
+    }, 2000)
 
-  },300)
+  }, 300)
 })
-ipcMain.on('initializer-response', (event,message) => {
-    logs("[RENDERER-Init]".bgGreen,message)
+ipcMain.on('initializer-response', (event, message) => {
+  logs("[RENDERER-Init]".bgGreen, message)
 })
-ipcMain.on('renderer-response-error', (event,message,location) => {
-    logs_error("[RENDERER-ERROR]".red,message,location)
+ipcMain.on('renderer-response-error', (event, message, location) => {
+  logs_error("[RENDERER-ERROR]".red, message, location)
 })
-ipcMain.on('renderer-response-unhandled-error', (event,message,location) => {
-    logs_error("[RENDERER-UNHANDLED-ERROR]".bgRed,message,location)
+ipcMain.on('renderer-response-unhandled-error', (event, message, location) => {
+  logs_error("[RENDERER-UNHANDLED-ERROR]".bgRed, message, location)
 })
-ipcMain.on('renderer-response-report-translationIssues', (event,message) => {
-    logs_translate("[RENDERER-translationIssues]".bgRed,message)
+ipcMain.on('renderer-response-report-translationIssues', (event, message) => {
+  logs_translate("[RENDERER-translationIssues]".bgRed, message)
 })
