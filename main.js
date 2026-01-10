@@ -4,17 +4,37 @@ if (logs) { main(); }
 function main() {
   try {
     const { dialog, nativeTheme, webContents, app, BrowserWindow, ipcMain, Menu } = require('electron')
+    // ✅ If another instance is already running, immediately close this one
+    const gotLock = app.requestSingleInstanceLock()
+
+    if (!gotLock) {
+      app.exit(0)
+    } 
+    else {
+      // Optional: when someone tries to launch again, focus the existing window
+      app.on('second-instance', () => {
+        const win = BrowserWindow.getAllWindows()[0]
+        if (win) {
+          if (win.isMinimized()) win.restore()
+          win.show()
+          win.focus()
+        }
+      })
+    }
     const Store = require('electron-store').default
     const path = require('path')
     const fs = require('fs')
-    const { execFileSync } = require('child_process')
-
+    
     const colors = require('colors')
-    const { windowPosition, autoUpdater } = require('./utils/utilities')
+    const { windowPosition, autoUpdater, runWinHidDump, getWinHidDumpPath } = require('./utils/utilities')
     const electronWindowIds = new Store({ name: "electronWindowIds" })
     const deviceInfo = new Store({ name: "deviceInfo" })
+    const viewerLogs = new Store({ name: "viewerLogs" })
     //! RESETS DEVICES TO DETECT NEW DEVICES
     // deviceInfo.set('devices', {})
+    if (!viewerLogs.get('log')) {
+      viewerLogs.set('log','[]')
+    }
     electronWindowIds.set('currentPage','joyview')
     if (!electronWindowIds.get('theme')) {
       electronWindowIds.set('theme','dark')
@@ -33,19 +53,16 @@ function main() {
       })
     }
 
-    function getWinHidDumpPath() {
-      // DEV: <projectRoot>\helpers\win\win-hid-dump.exe
-      // PACKAGED: <install>\resources\helpers\win\win-hid-dump.exe (extraResources -> process.resourcesPath)
-      const base = app.isPackaged ? process.resourcesPath : process.cwd()
-      return path.join(base, 'helpers', 'winhiddump', 'winhiddump.exe')
-    }
-    function runWinHidDump() {
-      const exePath = getWinHidDumpPath()
-      return execFileSync(exePath, [], { encoding: 'utf8', windowsHide: true })
-    }
+    
     function loadBrains() {
-      // Contains all ipcRenderer event listeners that must perform a PC related action.
-      // Brains Directory: Loop through all files and load them.
+      // Files listed here are loaded first, in this exact order.
+      // Any other .js files NOT listed here will still be loaded afterward.
+      const brainLoadOrder = [
+        'input-functions.js',
+        'keybinds-detection.js',
+        'input-detection.js'
+      ]
+
       let brainsDirectory = null
 
       if (app.isPackaged) {
@@ -60,8 +77,17 @@ function main() {
           return
         }
 
-        // only .js files
-        const jsFiles = files.filter(file => file.endsWith('.js'))
+        // Only .js files
+        const allJsFiles = files.filter(file => file.endsWith('.js'))
+
+        // Build the prioritized list (only those that exist in the folder)
+        const prioritized = brainLoadOrder.filter(name => allJsFiles.includes(name))
+
+        // Everything else not listed still gets loaded (preserve original order)
+        const unlisted = allJsFiles.filter(name => !brainLoadOrder.includes(name))
+
+        // Final load list: prioritized first, then the rest
+        const jsFiles = [...prioritized, ...unlisted]
 
         jsFiles.forEach((file, index) => {
           index++
@@ -85,15 +111,13 @@ function main() {
             }
 
             if (jsFiles.length === index) {
-              // const loadTime = (Date.now() - appStartTime) / 1000
-              // if (watcherConsoleDisplay("globalLogs")) {
-              //     logs("App-Initialization-Timer".bgMagenta, loadTime, "Seconds")
-              // }
+              // done loading brains
             }
           })
         })
       })
     }
+
 
     logs("=FLIGHT CONTROL VIEWER= START".green,"isPackaged:".yellow,`${JSON.stringify(app.isPackaged,null,2)}`.cyan, "Version:".yellow,`${JSON.stringify(app.getVersion(),null,2)}`.cyan)
     const { mainMenu,rightClickMenu } = require('./menumaker')
@@ -134,8 +158,8 @@ function main() {
       try {
         // Create a loading screen window
         win = new BrowserWindow({
-          width: !isNotDev ? 600 : 600,
-          height: 800,
+          width: !app.isPackaged ? 800 : 800,
+          height: 1000,
           webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,

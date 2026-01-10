@@ -1,4 +1,4 @@
-const {Menu, BrowserWindow, ipcMain} = require('electron')
+const {Menu, BrowserWindow, ipcMain, app } = require('electron')
 const {logs, logs_error, logs_debug} = require('./utils/logConfig')
 const { autoUpdater, cwd } = require('./utils/utilities')
 const Store = require('electron-store').default
@@ -6,10 +6,84 @@ const store = new Store({ name: 'electronWindowIds'})
 const path = require('path')
 const fs = require('fs')
 const links = {
-    dashboard: async function() {
-        store.set('currentPage','dashboard')
-        ipcMain.emit('changePage','change')
-        BrowserWindow.fromId(1).loadURL(`file://${path.join(cwd, 'renderers/dashboard/dashboard.html')}`)
+    clearLocalData: async function() {
+        logs("[APP]".bgMagenta, "Clearing Local User Data")
+        const filesToDelete = [
+            'actionmapsJSON.json',
+            'deviceInfo.json',
+            'electronWindowIds.json',
+            'viewerLogs.json'
+        ]
+        //todo change to setup page
+        deleteAppJsonFiles(filesToDelete)
+        function deleteAppJsonFiles(filesToDelete) {
+            const userDataPath = app.getPath('userData')
+           
+            for (const file of filesToDelete) {
+                const fullPath = path.join(userDataPath, file)
+                try {
+                    if (fs.existsSync(fullPath)) {
+                        fs.rmSync(fullPath, { recursive: true, force: true })
+                        logs_debug("[APP]".bgMagenta,`Deleted Local JSON files: ${fullPath}`.green)
+                    }
+                } 
+                catch (err) {
+                    logs_error("[APP]".bgMagenta,`Failed to delete Local JSON files: ${fullPath}`, err)
+                }
+            }
+            if (app.isPackaged) restartApp()
+        }
+        function restartApp() {
+            app.relaunch({ args: process.argv.slice(1), execPath: process.execPath })
+            for (const w of BrowserWindow.getAllWindows()) {
+                try { w.destroy() } catch {}
+            }
+            setImmediate(() => {
+                try { app.exit(0) } catch {}
+                // ultimate fallback if something still keeps the loop alive
+                setTimeout(() => process.exit(0), 150)
+            })
+
+        }
+    },
+    setup: async function() {
+        const filesToDelete = [
+            'deviceInfo.json',
+            'viewerLogs.json',
+        ]
+        deleteAppJsonFiles(filesToDelete)
+        function deleteAppJsonFiles(filesToDelete) {
+            const userDataPath = app.getPath('userData')
+           
+            for (const file of filesToDelete) {
+                const fullPath = path.join(userDataPath, file)
+                try {
+                    if (fs.existsSync(fullPath)) {
+                        fs.rmSync(fullPath, { recursive: true, force: true })
+                        logs_debug("[APP]".bgMagenta,`Deleted Local JSON files: ${fullPath}`.green)
+                    }
+                } 
+                catch (err) {
+                    logs_error("[APP]".bgMagenta,`Failed to delete Local JSON files: ${fullPath}`, err)
+                }
+            }
+            // if (app.isPackaged) restartApp()
+        }
+        function restartApp() {
+            app.relaunch({ args: process.argv.slice(1), execPath: process.execPath })
+            for (const w of BrowserWindow.getAllWindows()) {
+                try { w.destroy() } catch {}
+            }
+            setImmediate(() => {
+                try { app.exit(0) } catch {}
+                // ultimate fallback if something still keeps the loop alive
+                setTimeout(() => process.exit(0), 150)
+            })
+
+        }
+        store.set('currentPage','setup')
+        ipcMain.emit('setupPage','change')
+        BrowserWindow.fromId(1).loadURL(`file://${path.join(cwd, 'renderers/setup/setup.html')}`)
     },
     joyview: async function() {
         store.set('currentPage','joyview')
@@ -28,10 +102,10 @@ const links = {
 }
 
 const template = [
-    // {
-    //     label: 'Dashboard',
-    //     click: ()=>{links.dashboard();} 
-    // },
+    {
+        label: 'Setup',
+        click: ()=>{links.setup();} 
+    },
     
     // {
     //     label: 'Friends',
@@ -72,6 +146,10 @@ const template = [
             {
                 label: 'Check for Updates',
                 click: ()=>{links.checkForUpdates()}
+            },
+            {
+                label: 'Clear Local Data',
+                click: ()=>{links.clearLocalData()}
             },
         ]
     },

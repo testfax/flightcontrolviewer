@@ -9,6 +9,7 @@ const windowItemsStore = new Store({ name: 'electronWindowIds'})
 const showConsoleMessages = windowItemsStore.get('showConsoleMessages')
 const xml2js = require('xml2js')
 
+
 const util = { 
     formatJsonObject: function(obj, indent) {
         indent = indent || 0
@@ -192,7 +193,7 @@ const util = {
         if (!result.hasOwnProperty('clientSize')) { 
             // return {moveTo:[700,100], resizeTo:[600,600]}
             saveWindowPosition()
-            return {moveTo:[700,100], resizeTo:[366,600]}
+            return {moveTo:[639,18], resizeTo:[800,1000]}
         }
         if (init) {
             //If init is truthy, then return the result of the file contents and send back what you need.
@@ -241,6 +242,17 @@ const util = {
             rsi_actionmaps, 
             rsi_requested
         }
+    },
+    getWinHidDumpPath: function() {
+      // DEV: <projectRoot>\helpers\win\win-hid-dump.exe
+      // PACKAGED: <install>\resources\helpers\win\win-hid-dump.exe (extraResources -> process.resourcesPath)
+      const base = app.isPackaged ? process.resourcesPath : process.cwd()
+      return path.join(base, 'helpers', 'winhiddump', 'winhiddump.exe')
+    },
+    runWinHidDump: function() {
+        const { execFileSync } = require('child_process')
+        const exePath = util.getWinHidDumpPath()
+        return execFileSync(exePath, [], { encoding: 'utf8', windowsHide: true })
     }
 }
 

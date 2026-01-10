@@ -3,7 +3,7 @@ try {
     const masterSwitch = 1 // 0 = Off, 1 = On.
 
 
-
+    const os = require('os')
     const colors = require('colors')
     const fs = require('fs')
     const path = require('path')
@@ -140,7 +140,6 @@ try {
             console.log("[LOGS]".red,error)
         }
     }
-
     function getCitizen() {
         try {
             const extractHandle = (line) => {
@@ -162,7 +161,44 @@ try {
         catch(e) { console.log("[LOGS]".red,"getCitizen: No Game Logs Yet...",e) }
     }
     function client_path(request) {
-        let rsi_stockLocation = path.join('C:','Program Files','Roberts Space Industries','StarCitizen','LIVE')
+        function findStarCitizenLive() {
+            const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming')
+            const rsiSettingsPath = path.join(appData, 'rsilauncher', 'settings.json')
+
+            // 1️⃣ Try RSI launcher settings
+            if (fs.existsSync(rsiSettingsPath)) {
+                try {
+                const settings = JSON.parse(fs.readFileSync(rsiSettingsPath, 'utf8'))
+                const folders = settings?.library?.folders || []
+
+                for (const folder of folders) {
+                    const livePath = path.join(folder.path, 'StarCitizen', 'LIVE')
+                    if (fs.existsSync(livePath)) {
+                    return livePath
+                    }
+                }
+                } catch (err) {
+                console.error('Failed to parse RSI settings.json', err)
+                }
+            }
+
+            // 2️⃣ Fallback: default install
+            const defaultPath = path.join(
+                'C:',
+                'Program Files',
+                'Roberts Space Industries',
+                'StarCitizen',
+                'LIVE'
+            )
+
+            if (fs.existsSync(defaultPath)) {
+                return defaultPath
+            }
+
+            return null
+        }
+        let rsi_stockLocation = findStarCitizenLive()
+        // let rsi_stockLocation = path.join('C:','Program Files','Roberts Space Industries','StarCitizen','LIVE')
         let rsi_path = path.normalize(rsi_stockLocation)
         const files = fs.readdirSync(rsi_path);
         let rsi_savedMappings = null

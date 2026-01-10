@@ -1,6 +1,6 @@
 {
   "name": "flightcontrolviewer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Star Citizen Flight Control Viewer",
   "main": "main.js",
   "scripts": {
@@ -18,24 +18,26 @@
     "appId": "com.testfax.flightcontrolviewer",
     "productName": "Star Citizen Flight Control Viewer",
     "asar": false,
+
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/icon.ico"
     },
+
+    "nsis": {
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
+    },
+
     "linux": {
-      "target": [
-        "deb",
-        "rpm",
-        "AppImage",
-        "snap",
-        "portable"
-      ],
+      "target": ["deb", "rpm", "AppImage", "snap", "portable"],
+      "icon": "build/icon.png",
       "extraResources": [
-        {
-          "from": "helpers",
-          "to": "helpers"
-        }
+        { "from": "helpers", "to": "helpers" }
       ]
     },
+
     "files": [
       "**/*",
       "!**/.vscode/**",
