@@ -1145,6 +1145,7 @@ function startInputLoggerForDevice(d, parsed) {
     // Warmup sampling (UI only) + lazy init
     for (const a of axes) {
       const outKey = `${prefix}axis_${a.name}`
+      logs(outKey)
 
       const rawU = readBitsAsUnsignedLE(payload, a.bitOffset, a.bitSize)
       let val = rawU
@@ -1177,6 +1178,7 @@ function startInputLoggerForDevice(d, parsed) {
     }
 
     // After WARMUP_MS, persist usable axes for UI (never blocks input)
+
     if (!usableAxesPersisted && warmupStartedAt !== 0) {
       const age = Date.now() - warmupStartedAt
       if (age >= WARMUP_MS) {
@@ -1199,8 +1201,8 @@ function startInputLoggerForDevice(d, parsed) {
 
         if (usableNow.length) {
           setDeviceUsableAxes(d, usableNow)
-          // ✅ FIX: DO NOT call initializeUI from warmup (this caused "loads twice" + can block init if page gate fails)
-          // UI will pick up usableAxes on the next initializeUI call (main() / page change)
+          //✅ FIX: DO NOT call initializeUI from warmup (this caused "loads twice" + can block init if page gate fails)
+          //UI will pick up usableAxes on the next initializeUI call (main() / page change)
         }
 
         usableAxesPersisted = true
