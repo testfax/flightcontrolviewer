@@ -630,48 +630,75 @@ function startInputLoggerForDevice(d, parsed) {
     return true
   }
 
+  // ✅ quick sanity: show that we actually attached listeners for this device
+  if (showConsoleMessages) {
+    console.log(prefix + 'listeners', {
+      data: device.listenerCount('data'),
+      error: device.listenerCount('error')
+    })
+  }
+
   device.on('data', (data) => {
     let rid = 0
     let payload = data
 
     // ============================================================
-    // ✅ FIX: node-hid may omit the report-id byte (even if the
-    // descriptor uses Report IDs). If the first byte isn't a RID we
-    // actually parsed, treat it as payload, and on single-RID
-    // devices (VKB/Virpil: usually RID=1) assume that RID.
+    // ✅ FIX: handle devices/driver stacks that DO NOT include the
+    // report-id byte in the data stream (common with some HID paths)
+    //
+    // If the descriptor defines Report ID 1 (85 01) but the incoming
+    // packet's first byte is NOT a known RID, assume rid=1 and DO NOT
+    // slice payload.
     // ============================================================
     if (parsed.hasReportIds) {
-      const knownRids = Array.from(new Set([
-        ...parsed.buttonsByReport.keys(),
-        ...parsed.axesByReport.keys()
-      ])).filter(n => Number.isFinite(n)).sort((a, b) => a - b)
+      const ridCandidate = data[0]
 
-      const first = data[0]
-      const isKnownRid = knownRids.includes(first)
+      const hasRidCandidate =
+        parsed.buttonsByReport.has(ridCandidate) || parsed.axesByReport.has(ridCandidate)
 
-      if (isKnownRid) {
-        rid = first
+      if (hasRidCandidate) {
+        // normal case: first byte is report id
+        rid = ridCandidate
         payload = data.slice(1)
       } else {
-        // If descriptor only has one RID (your common case), assume node-hid omitted the RID byte
-        if (knownRids.length === 1) {
-          rid = knownRids[0]
+        const hasRid1 = parsed.buttonsByReport.has(1) || parsed.axesByReport.has(1)
+        const hasRid0 = parsed.buttonsByReport.has(0) || parsed.axesByReport.has(0)
+
+        // if our parsed descriptor only defines rid=1, treat this packet as rid=1
+        if (hasRid1 && !hasRid0) {
+          rid = 1
           payload = data
+
+          if (!unknownRidWarned.has(ridCandidate)) {
+            unknownRidWarned.add(ridCandidate)
+            logs_warn('[BRAIN]'.bgYellow, 'input-detection'.yellow, 'ReportId missing from data stream (treating as rid=1)'.yellow, {
+              gotFirstByte: ridCandidate,
+              assumedRid: 1,
+              len: data.length,
+              product: d.product,
+              path: d.path
+            })
+          }
         } else {
-          // multi-RID device but unknown first byte: safest is treat as non-RID packet
+          // fallback: old behavior
           rid = 0
           payload = data
-        }
 
-        if (!unknownRidWarned.has(first)) {
-          unknownRidWarned.add(first)
-          logs_warn('[BRAIN]'.bgYellow, 'input-detection'.yellow, 'Unknown RID byte (treating as payload)'.red, {
-            gotFirstByte: first,
-            knownRids,
-            len: data.length,
-            product: d.product,
-            path: d.path
-          })
+          if (!unknownRidWarned.has(ridCandidate)) {
+            unknownRidWarned.add(ridCandidate)
+            const haveRids = Array.from(new Set([
+              ...parsed.buttonsByReport.keys(),
+              ...parsed.axesByReport.keys()
+            ])).sort((a, b) => a - b)
+
+            logs_warn('[BRAIN]'.bgYellow, 'input-detection'.yellow, 'Unknown RID from device (falling back to rid=0)'.red, {
+              gotRid: ridCandidate,
+              haveRids,
+              len: data.length,
+              product: d.product,
+              path: d.path
+            })
+          }
         }
       }
     }
