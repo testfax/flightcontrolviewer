@@ -1166,11 +1166,11 @@ function initializeUI(data, receiver) {
     blastToUI(sortedPackage)
     logs_warn(pkg)
     setTimeout(() => {
-      init = 0
-      const package = { receiver: "from_brain-detection-ready", data: 1 }
-      blastToUI(package)
-      logs('=== Ready to Receive Inputs ==='.green)
-    }, 2000)
+    init = 0
+    const package = { receiver: "from_brain-detection-ready", data: 1 }
+    blastToUI(package)
+    logs('=== Ready to Receive Inputs ==='.green)
+  }, 2000)
   }
 }
 function setupUI(data, receiver) {
@@ -1229,6 +1229,12 @@ function setupUI(data, receiver) {
 
   blastToUI(pkg)
   logs_warn(pkg)
+
+
+  const package1 = { receiver: "from_brain-detection", data: deviceInfo.get() }
+  blastToUI(package1)
+
+
   init = 0
   const package = { receiver: "from_brain-detection-ready", data: 1 }
   blastToUI(package)
@@ -1244,7 +1250,6 @@ let page = 'joyview'
 setTimeout(() => {
   main()
 }, 250)
-
 
 //#############################
 
