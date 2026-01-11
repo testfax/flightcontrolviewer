@@ -46,7 +46,7 @@ const links = {
 
         }
     },
-    setup: async function() {
+    logs: async function() {
         const filesToDelete = [
             'deviceInfo.json',
             'viewerLogs.json',
@@ -103,8 +103,8 @@ const links = {
 
 const template = [
     {
-        label: 'Setup',
-        click: ()=>{links.setup();} 
+        label: 'Logs',
+        click: ()=>{links.logs();} 
     },
     
     // {

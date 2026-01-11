@@ -14,6 +14,7 @@ const staticData = require('../staticData.json')
 const fs = require('fs')
 const path = require('path')
 const { pathToFileURL } = require('url')
+const colors = require('colors')  
 
 function toHex4(n) {
   return Number(n).toString(16).toUpperCase().padStart(4, '0')
@@ -556,6 +557,10 @@ function hatValueToDirs(v) {
 
 function startInputLoggerForDevice(d, parsed) {
   correctControls()
+  let packetCount = 0
+  let lastPacketAt = 0
+  let debugPacketCount = 0
+  const DEBUG_FIRST_PACKETS = 10
   const prefix = jsPrefixForDevice(d)
   let device = null
   try {
@@ -631,17 +636,25 @@ function startInputLoggerForDevice(d, parsed) {
   }
 
   // ✅ quick sanity: show that we actually attached listeners for this device
-  if (showConsoleMessages) {
-    logs(prefix + 'listeners', {
-      data: device.listenerCount('data'),
-      error: device.listenerCount('error')
-    })
-  }
-
   device.on('data', (data) => {
+    debugPacketCount += 1
+    
+// show first few packets no matter what (proves listener is firing)
+    if (debugPacketCount <= DEBUG_FIRST_PACKETS) {
+      const first = data && data.length ? data[0] : null
+      logs(
+        `[${prefix}] data packet #${debugPacketCount} len=${data.length} firstByte=${first} path=${d.path}`
+      )
+    }
+    packetCount += 1
+    lastPacketAt = Date.now()
+
+    if (packetCount <= 10) {
+      logs(`[${prefix}] packet #${packetCount} len=${data.length} first=${data[0]}`)
+    }
     let rid = 0
     let payload = data
-
+    
     // ============================================================
     // ✅ FIX: handle devices/driver stacks that DO NOT include the
     // report-id byte in the data stream (common with some HID paths)
@@ -926,7 +939,10 @@ function startInputLoggerForDevice(d, parsed) {
       axisActive.set(out, isActive)
     }
   })
-
+  setInterval(() => {
+  const age = lastPacketAt ? (Date.now() - lastPacketAt) : null
+  logs(`[${prefix}] packets=${packetCount} lastAgeMs=${age}`)
+}, 2000)
   device.on('error', (err) => {
     logs_error(err)
     console.log(err)
@@ -935,6 +951,18 @@ function startInputLoggerForDevice(d, parsed) {
       app.relaunch()
       app.exit(0)
     }, 8000)
+  })
+    logs(`[${prefix}] listeners attached`, {
+    data: device.listenerCount('data'),
+    error: device.listenerCount('error'),
+    path: d.path,
+    product: d.product
+  })
+
+  // optional: also send to UI so you see it even if console is hidden
+  blastToUI({
+    receiver: 'from_brain-detection',
+    message: `Input-Detection: ${prefix} listeners attached (data=${device.listenerCount('data')} error=${device.listenerCount('error')})`
   })
 }
 function findKeybind(key, discoveredKeybinds) {
