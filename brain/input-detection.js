@@ -864,7 +864,7 @@ function initializeUI(data, receiver) {
       devMode
     }
     blastToUI(sortedPackage)
-    // logs_warn(pkg)
+    // logs_warn(pkg) dont enable
     setTimeout(() => {
       init = 0
       const package = { receiver: "from_brain-detection-ready", data: 1 }
@@ -931,7 +931,7 @@ function setupUI(data, receiver) {
   logs_warn(pkg)
 
   const package1 = { receiver: "from_brain-detection", data: deviceInfo.get() }
-  // blastToUI(package1)
+  blastToUI(package1)
 
   init = 0
   const package = { receiver: "from_brain-detection-ready", data: 1 }
@@ -1145,7 +1145,7 @@ function startInputLoggerForDevice(d, parsed) {
     // Warmup sampling (UI only) + lazy init
     for (const a of axes) {
       const outKey = `${prefix}axis_${a.name}`
-      logs(outKey)
+      // logs(outKey)
 
       const rawU = readBitsAsUnsignedLE(payload, a.bitOffset, a.bitSize)
       let val = rawU
@@ -1177,7 +1177,7 @@ function startInputLoggerForDevice(d, parsed) {
       axisSeen.set(outKey, (axisSeen.get(outKey) || 0) + 1)
     }
 
-    // After WARMUP_MS, persist usable axes for UI (never blocks input)
+    //After WARMUP_MS, persist usable axes for UI (never blocks input)
 
     if (!usableAxesPersisted && warmupStartedAt !== 0) {
       const age = Date.now() - warmupStartedAt
@@ -1190,6 +1190,7 @@ function startInputLoggerForDevice(d, parsed) {
 
             const k = `${prefix}axis_${ax.name}`
             const seen = axisSeen.get(k) || 0
+            logs(k,seen)
             if (seen < WARMUP_MIN_SAMPLES) continue
 
             const mn = axisMin.get(k)
@@ -1209,7 +1210,7 @@ function startInputLoggerForDevice(d, parsed) {
       }
     }
 
-    // Buttons
+    //Buttons
     for (const b of buttons) {
       const key = `${rid}:${b.usage}`
       const prev = lastButtons.get(key) || false
@@ -1228,7 +1229,7 @@ function startInputLoggerForDevice(d, parsed) {
       lastButtons.set(key, down)
     }
 
-    // Axes (including hats, but hats are handled as POV -> virtual buttons)
+    //Axes (including hats, but hats are handled as POV -> virtual buttons)
     for (const a of axes) {
       const out = `${prefix}axis_${a.name}`
 
