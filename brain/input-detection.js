@@ -72,7 +72,7 @@ function setDeviceUsableAxes(d, axisNames) {
   if (!devices[key]) return
 
   const uniq = Array.from(new Set(axisNames)).filter(Boolean)
-  logs("UNIQUE ENTRY:".yellow, uniq)
+  logs("UNIQUE ENTRY:".yellow, d.product, uniq)
   devices[key].usableAxes = uniq
   devices[key].usableAxesSavedAt = Math.floor(Date.now() / 1000)
 
@@ -1125,6 +1125,66 @@ function startInputLoggerForDevice(d, parsed) {
     return { rid, payload }
   }
 
+  // ✅ FIX: precompute axis names per RID so warmup doesn't get polluted by "same name in different RID"
+  // (this is a big reason you see [] / only 'y' in weird cases)
+  const axisNameByRid = new Map()
+  for (const [rid, arr] of parsed.axesByReport.entries()) {
+    axisNameByRid.set(rid, new Set((arr || []).map(a => a && a.name).filter(Boolean)))
+  }
+
+  // ✅ FIX: warmup uses REAL axes list across ALL RIDs, but stores per-device usable axes by UNIQUE name
+  function persistUsableAxesOnce() {
+    if (usableAxesPersisted) return
+    if (warmupStartedAt === 0) return
+    const age = Date.now() - warmupStartedAt
+    if (age < WARMUP_MS) return
+
+    const usableSet = new Set()
+    const usableNow = []
+
+    for (const list of parsed.axesByReport.values()) {
+      for (const ax of list) {
+        if (!ax || !ax.name) continue
+        if (isHatAxis(ax.usagePage, ax.usage, ax.name)) continue
+
+        const k = `${prefix}axis_${ax.name}`
+        const seen = axisSeen.get(k) || 0
+        if (seen < WARMUP_MIN_SAMPLES) continue
+
+        // ✅ FIX #1: "usable" means "exists + we observed it" (not "moved")
+        // This prevents [] unless the user wiggles during warmup.
+        if (!usableSet.has(ax.name)) {
+          usableSet.add(ax.name)
+          usableNow.push(ax.name)
+        }
+      }
+    }
+
+    // If *nothing* met sample requirements, fall back to "all non-hat axes in descriptor"
+    // (prevents empty axes list on quiet devices / no input during first 2s)
+    if (!usableNow.length) {
+      for (const list of parsed.axesByReport.values()) {
+        for (const ax of list) {
+          if (!ax || !ax.name) continue
+          if (isHatAxis(ax.usagePage, ax.usage, ax.name)) continue
+          if (!usableSet.has(ax.name)) {
+            usableSet.add(ax.name)
+            usableNow.push(ax.name)
+          }
+        }
+      }
+    }
+
+    logs(d.product, usableNow)
+
+    if (usableNow.length) {
+      setDeviceUsableAxes(d, usableNow)
+      // ✅ IMPORTANT: do NOT call initializeUI here (your note)
+    }
+
+    usableAxesPersisted = true
+  }
+
   device.on('data', (data) => {
     const resolved = resolveRidAndPayload(data)
     const rid = resolved.rid
@@ -1145,7 +1205,6 @@ function startInputLoggerForDevice(d, parsed) {
     // Warmup sampling (UI only) + lazy init
     for (const a of axes) {
       const outKey = `${prefix}axis_${a.name}`
-      // logs(outKey)
 
       const rawU = readBitsAsUnsignedLE(payload, a.bitOffset, a.bitSize)
       let val = rawU
@@ -1177,40 +1236,10 @@ function startInputLoggerForDevice(d, parsed) {
       axisSeen.set(outKey, (axisSeen.get(outKey) || 0) + 1)
     }
 
-    //After WARMUP_MS, persist usable axes for UI (never blocks input)
+    // ✅ FIX #2: warmup persistence happens once, never blocks input
+    persistUsableAxesOnce()
 
-    if (!usableAxesPersisted && warmupStartedAt !== 0) {
-      const age = Date.now() - warmupStartedAt
-      if (age >= WARMUP_MS) {
-        const usableNow = []
-
-        for (const list of parsed.axesByReport.values()) {
-          for (const ax of list) {
-            if (isHatAxis(ax.usagePage, ax.usage, ax.name)) continue
-
-            const k = `${prefix}axis_${ax.name}`
-            const seen = axisSeen.get(k) || 0
-            logs(k,seen)
-            if (seen < WARMUP_MIN_SAMPLES) continue
-
-            const mn = axisMin.get(k)
-            const mx = axisMax.get(k)
-            const span = Math.abs((mx ?? 0) - (mn ?? 0))
-            if (span > WARMUP_EPS) usableNow.push(ax.name)
-          }
-        }
-
-        if (usableNow.length) {
-          setDeviceUsableAxes(d, usableNow)
-          //✅ FIX: DO NOT call initializeUI from warmup (this caused "loads twice" + can block init if page gate fails)
-          //UI will pick up usableAxes on the next initializeUI call (main() / page change)
-        }
-
-        usableAxesPersisted = true
-      }
-    }
-
-    //Buttons
+    // Buttons
     for (const b of buttons) {
       const key = `${rid}:${b.usage}`
       const prev = lastButtons.get(key) || false
@@ -1229,7 +1258,7 @@ function startInputLoggerForDevice(d, parsed) {
       lastButtons.set(key, down)
     }
 
-    //Axes (including hats, but hats are handled as POV -> virtual buttons)
+    // Axes (including hats, but hats are handled as POV -> virtual buttons)
     for (const a of axes) {
       const out = `${prefix}axis_${a.name}`
 
@@ -1363,6 +1392,7 @@ function startInputLoggerForDevice(d, parsed) {
     message: `Input-Detection: ${prefix} listeners attached (data=${device.listenerCount('data')} error=${device.listenerCount('error')})`
   })
 }
+
 
 //VERY FIRST TIME RUN ONLY!!!!
 let init = 1
