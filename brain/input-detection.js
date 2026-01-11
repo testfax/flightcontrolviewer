@@ -634,31 +634,48 @@ function startInputLoggerForDevice(d, parsed) {
     let rid = 0
     let payload = data
 
+    // ============================================================
+    // ✅ FIX: node-hid may omit the report-id byte (even if the
+    // descriptor uses Report IDs). If the first byte isn't a RID we
+    // actually parsed, treat it as payload, and on single-RID
+    // devices (VKB/Virpil: usually RID=1) assume that RID.
+    // ============================================================
     if (parsed.hasReportIds) {
-      rid = data[0]
-      payload = data.slice(1)
+      const knownRids = Array.from(new Set([
+        ...parsed.buttonsByReport.keys(),
+        ...parsed.axesByReport.keys()
+      ])).filter(n => Number.isFinite(n)).sort((a, b) => a - b)
 
-      // ✅ FIX: if we receive a RID we don't have in the parsed maps, fall back to non-RID parsing
-      const hasRid = parsed.buttonsByReport.has(rid) || parsed.axesByReport.has(rid)
-      if (!hasRid) {
-        if (!unknownRidWarned.has(rid)) {
-          unknownRidWarned.add(rid)
-          const haveRids = Array.from(new Set([
-            ...parsed.buttonsByReport.keys(),
-            ...parsed.axesByReport.keys()
-          ])).sort((a, b) => a - b)
-          logs_warn('[BRAIN]'.bgYellow, 'input-detection'.yellow, 'Unknown RID from device (falling back to rid=0)'.red, {
-            gotRid: rid,
-            haveRids,
+      const first = data[0]
+      const isKnownRid = knownRids.includes(first)
+
+      if (isKnownRid) {
+        rid = first
+        payload = data.slice(1)
+      } else {
+        // If descriptor only has one RID (your common case), assume node-hid omitted the RID byte
+        if (knownRids.length === 1) {
+          rid = knownRids[0]
+          payload = data
+        } else {
+          // multi-RID device but unknown first byte: safest is treat as non-RID packet
+          rid = 0
+          payload = data
+        }
+
+        if (!unknownRidWarned.has(first)) {
+          unknownRidWarned.add(first)
+          logs_warn('[BRAIN]'.bgYellow, 'input-detection'.yellow, 'Unknown RID byte (treating as payload)'.red, {
+            gotFirstByte: first,
+            knownRids,
             len: data.length,
             product: d.product,
             path: d.path
           })
         }
-        rid = 0
-        payload = data
       }
     }
+    // ============================================================
 
     const buttons = parsed.buttonsByReport.get(rid) || []
     const axes = parsed.axesByReport.get(rid) || []
