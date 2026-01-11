@@ -417,7 +417,18 @@ function parseInputsFromReportDescriptor(descBuf) {
   for (const [rid, arr] of buttonsByReport.entries()) arr.sort((a, b) => a.usage - b.usage)
   for (const [rid, arr] of axesByReport.entries()) arr.sort((a, b) => (a.name > b.name ? 1 : -1))
 
-  return { hasReportIds: reportIdsSeen.size > 0, buttonsByReport, axesByReport }
+  // ✅ NEW: record total bits per report so we can match packets by payload length
+  const reportBitsByReport = new Map()
+  const allRids = new Set([
+    ...buttonsByReport.keys(),
+    ...axesByReport.keys(),
+    ...bitCursor.keys()
+  ])
+  for (const rid of allRids) {
+    reportBitsByReport.set(rid, cursorGet(rid))
+  }
+
+  return { hasReportIds: reportIdsSeen.size > 0, buttonsByReport, axesByReport, reportBitsByReport }
 }
 function readButtonBit(buf, bitOffset) {
   const byteIndex = Math.floor(bitOffset / 8)
@@ -443,6 +454,7 @@ function bufferToHexString(buf) {
 function inputsMapsToPlain(parsed) {
   const buttons = {}
   const axes = {}
+  const bits = {}
 
   for (const [rid, arr] of parsed.buttonsByReport.entries()) {
     buttons[String(rid)] = arr.map(b => ({ usage: b.usage, bitOffset: b.bitOffset, bitSize: b.bitSize }))
@@ -459,14 +471,28 @@ function inputsMapsToPlain(parsed) {
     }))
   }
 
-  return { hasReportIds: parsed.hasReportIds ? 1 : 0, buttonsByReport: buttons, axesByReport: axes }
+  // ✅ NEW: persist bits per RID so we can resolve missing report-id byte reliably
+  if (parsed.reportBitsByReport && typeof parsed.reportBitsByReport.entries === 'function') {
+    for (const [rid, v] of parsed.reportBitsByReport.entries()) {
+      bits[String(rid)] = v
+    }
+  }
+
+  return {
+    hasReportIds: parsed.hasReportIds ? 1 : 0,
+    buttonsByReport: buttons,
+    axesByReport: axes,
+    reportBitsByReport: bits
+  }
 }
 function plainToInputsMaps(plain) {
   const buttonsByReport = new Map()
   const axesByReport = new Map()
+  const reportBitsByReport = new Map()
 
   const buttons = plain && plain.buttonsByReport ? plain.buttonsByReport : {}
   const axes = plain && plain.axesByReport ? plain.axesByReport : {}
+  const bits = plain && plain.reportBitsByReport ? plain.reportBitsByReport : {}
 
   Object.keys(buttons).forEach(ridStr => {
     const rid = Number(ridStr)
@@ -488,7 +514,18 @@ function plainToInputsMaps(plain) {
     })))
   })
 
-  return { hasReportIds: plain && plain.hasReportIds ? true : false, buttonsByReport, axesByReport }
+  Object.keys(bits).forEach(ridStr => {
+    const rid = Number(ridStr)
+    const v = Number(bits[ridStr])
+    if (Number.isFinite(v)) reportBitsByReport.set(rid, v)
+  })
+
+  return {
+    hasReportIds: plain && plain.hasReportIds ? true : false,
+    buttonsByReport,
+    axesByReport,
+    reportBitsByReport
+  }
 }
 function learnAndPersistDevice(d, dumpText) {
   // IMPORTANT CHANGE: pass the full device so we can match by PATH
@@ -625,60 +662,128 @@ function startInputLoggerForDevice(d, parsed) {
     return true
   }
 
-  device.on('data', (data) => {
+  // ✅ NEW: pick RID by expected payload length (fixes VKB "firstByte looks random" cases)
+  function expectedPayloadLenForRid(rid) {
+    if (!parsed.reportBitsByReport || !parsed.reportBitsByReport.has(rid)) return null
+    const bits = parsed.reportBitsByReport.get(rid) || 0
+    const bytes = Math.ceil(bits / 8)
+    if (!Number.isFinite(bytes) || bytes <= 0) return null
+    return bytes
+  }
+
+  function resolveRidAndPayload(dataBuf) {
     let rid = 0
-    let payload = data
+    let payload = dataBuf
 
-    // ✅ FIX: handle devices/driver stacks that DO NOT include the report-id byte
-    if (parsed.hasReportIds) {
-      const ridCandidate = data[0]
+    if (!parsed.hasReportIds) {
+      return { rid, payload }
+    }
 
-      const hasRidCandidate =
-        parsed.buttonsByReport.has(ridCandidate) || parsed.axesByReport.has(ridCandidate)
+    const ridCandidate = dataBuf[0]
 
-      if (hasRidCandidate) {
+    // If candidate is a parsed RID, only accept it if slicing makes sense by size
+    const candidateKnown =
+      parsed.buttonsByReport.has(ridCandidate) || parsed.axesByReport.has(ridCandidate)
+
+    if (candidateKnown) {
+      const exp = expectedPayloadLenForRid(ridCandidate)
+      const slicedLen = dataBuf.length - 1
+
+      // If we know expected length and it matches sliced payload, trust it
+      if (exp != null && exp === slicedLen) {
         rid = ridCandidate
-        payload = data.slice(1)
-      } else {
-        const hasRid1 = parsed.buttonsByReport.has(1) || parsed.axesByReport.has(1)
-        const hasRid0 = parsed.buttonsByReport.has(0) || parsed.axesByReport.has(0)
+        payload = dataBuf.slice(1)
+        return { rid, payload }
+      }
 
-        if (hasRid1 && !hasRid0) {
-          rid = 1
-          payload = data
+      // If we don't know expected length, keep old behavior (trust first byte as RID)
+      if (exp == null) {
+        rid = ridCandidate
+        payload = dataBuf.slice(1)
+        return { rid, payload }
+      }
+      // otherwise fall through to heuristic below
+    }
 
-          if (!unknownRidWarned.has(ridCandidate)) {
-            unknownRidWarned.add(ridCandidate)
-            logs_warn('[BRAIN]'.bgYellow, 'input-detection'.yellow, 'ReportId missing from data stream (treating as rid=1)'.yellow, {
-              gotFirstByte: ridCandidate,
-              assumedRid: 1,
-              len: data.length,
-              product: d.product,
-              path: d.path
-            })
-          }
-        } else {
-          rid = 0
-          payload = data
+    const haveRids = Array.from(new Set([
+      ...parsed.buttonsByReport.keys(),
+      ...parsed.axesByReport.keys()
+    ])).sort((a, b) => a - b)
 
-          if (!unknownRidWarned.has(ridCandidate)) {
-            unknownRidWarned.add(ridCandidate)
-            const haveRids = Array.from(new Set([
-              ...parsed.buttonsByReport.keys(),
-              ...parsed.axesByReport.keys()
-            ])).sort((a, b) => a - b)
-
-            logs_warn('[BRAIN]'.bgYellow, 'input-detection'.yellow, 'Unknown RID from device (falling back to rid=0)'.red, {
-              gotRid: ridCandidate,
-              haveRids,
-              len: data.length,
-              product: d.product,
-              path: d.path
-            })
-          }
-        }
+    // Heuristic: pick a RID whose expected payload length matches the full buffer length
+    let bestRid = null
+    for (const r of haveRids) {
+      const exp = expectedPayloadLenForRid(r)
+      if (exp == null) continue
+      if (exp === dataBuf.length) {
+        bestRid = r
+        break
       }
     }
+
+    // If we found a match, treat buffer as payload (RID byte missing from stream)
+    if (bestRid != null) {
+      rid = bestRid
+      payload = dataBuf
+
+      if (!unknownRidWarned.has(ridCandidate)) {
+        unknownRidWarned.add(ridCandidate)
+        logs_warn('[BRAIN]'.bgYellow, 'input-detection'.yellow, 'ReportId missing from data stream (matched by payload length)'.yellow, {
+          gotFirstByte: ridCandidate,
+          assumedRid: bestRid,
+          len: dataBuf.length,
+          product: d.product,
+          path: d.path
+        })
+      }
+
+      return { rid, payload }
+    }
+
+    // Final fallback: if rid=1 exists and rid=0 does not, assume rid=1 with full payload
+    const hasRid1 = parsed.buttonsByReport.has(1) || parsed.axesByReport.has(1)
+    const hasRid0 = parsed.buttonsByReport.has(0) || parsed.axesByReport.has(0)
+
+    if (hasRid1 && !hasRid0) {
+      rid = 1
+      payload = dataBuf
+
+      if (!unknownRidWarned.has(ridCandidate)) {
+        unknownRidWarned.add(ridCandidate)
+        logs_warn('[BRAIN]'.bgYellow, 'input-detection'.yellow, 'ReportId missing from data stream (fallback rid=1)'.yellow, {
+          gotFirstByte: ridCandidate,
+          assumedRid: 1,
+          len: dataBuf.length,
+          product: d.product,
+          path: d.path
+        })
+      }
+
+      return { rid, payload }
+    }
+
+    // Otherwise fall back to rid=0 full payload (old behavior)
+    rid = 0
+    payload = dataBuf
+
+    if (!unknownRidWarned.has(ridCandidate)) {
+      unknownRidWarned.add(ridCandidate)
+      logs_warn('[BRAIN]'.bgYellow, 'input-detection'.yellow, 'Unknown RID from device (falling back to rid=0)'.red, {
+        gotRid: ridCandidate,
+        haveRids,
+        len: dataBuf.length,
+        product: d.product,
+        path: d.path
+      })
+    }
+
+    return { rid, payload }
+  }
+
+  device.on('data', (data) => {
+    const resolved = resolveRidAndPayload(data)
+    const rid = resolved.rid
+    const payload = resolved.payload
 
     const buttons = parsed.buttonsByReport.get(rid) || []
     const axes = parsed.axesByReport.get(rid) || []
