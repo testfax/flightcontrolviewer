@@ -632,7 +632,7 @@ function startInputLoggerForDevice(d, parsed) {
 
   // ✅ quick sanity: show that we actually attached listeners for this device
   if (showConsoleMessages) {
-    console.log(prefix + 'listeners', {
+    logs(prefix + 'listeners', {
       data: device.listenerCount('data'),
       error: device.listenerCount('error')
     })
