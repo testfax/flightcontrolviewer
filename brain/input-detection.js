@@ -1007,7 +1007,7 @@ function startInputLoggerForDevice(d, parsed) {
     return true
   }
 
-  // ✅ NEW: pick RID by expected payload length (fixes VKB "firstByte looks random" cases)
+  // ✅ pick RID by expected payload length (fixes VKB "firstByte looks random" cases)
   function expectedPayloadLenForRid(rid) {
     if (!parsed.reportBitsByReport || !parsed.reportBitsByReport.has(rid)) return null
     const bits = parsed.reportBitsByReport.get(rid) || 0
@@ -1026,7 +1026,6 @@ function startInputLoggerForDevice(d, parsed) {
 
     const ridCandidate = dataBuf[0]
 
-    // If candidate is a parsed RID, only accept it if slicing makes sense by size
     const candidateKnown =
       parsed.buttonsByReport.has(ridCandidate) || parsed.axesByReport.has(ridCandidate)
 
@@ -1034,20 +1033,17 @@ function startInputLoggerForDevice(d, parsed) {
       const exp = expectedPayloadLenForRid(ridCandidate)
       const slicedLen = dataBuf.length - 1
 
-      // If we know expected length and it matches sliced payload, trust it
       if (exp != null && exp === slicedLen) {
         rid = ridCandidate
         payload = dataBuf.slice(1)
         return { rid, payload }
       }
 
-      // If we don't know expected length, keep old behavior (trust first byte as RID)
       if (exp == null) {
         rid = ridCandidate
         payload = dataBuf.slice(1)
         return { rid, payload }
       }
-      // otherwise fall through to heuristic below
     }
 
     const haveRids = Array.from(new Set([
@@ -1055,7 +1051,7 @@ function startInputLoggerForDevice(d, parsed) {
       ...parsed.axesByReport.keys()
     ])).sort((a, b) => a - b)
 
-    // Heuristic: pick a RID whose expected payload length matches the full buffer length
+    // match a RID whose expected payload length matches full buffer length (RID byte missing from stream)
     let bestRid = null
     for (const r of haveRids) {
       const exp = expectedPayloadLenForRid(r)
@@ -1066,7 +1062,6 @@ function startInputLoggerForDevice(d, parsed) {
       }
     }
 
-    // If we found a match, treat buffer as payload (RID byte missing from stream)
     if (bestRid != null) {
       rid = bestRid
       payload = dataBuf
@@ -1085,7 +1080,6 @@ function startInputLoggerForDevice(d, parsed) {
       return { rid, payload }
     }
 
-    // Final fallback: if rid=1 exists and rid=0 does not, assume rid=1 with full payload
     const hasRid1 = parsed.buttonsByReport.has(1) || parsed.axesByReport.has(1)
     const hasRid0 = parsed.buttonsByReport.has(0) || parsed.axesByReport.has(0)
 
@@ -1107,7 +1101,6 @@ function startInputLoggerForDevice(d, parsed) {
       return { rid, payload }
     }
 
-    // Otherwise fall back to rid=0 full payload (old behavior)
     rid = 0
     payload = dataBuf
 
@@ -1125,23 +1118,17 @@ function startInputLoggerForDevice(d, parsed) {
     return { rid, payload }
   }
 
-  // ✅ FIX: precompute axis names per RID so warmup doesn't get polluted by "same name in different RID"
-  // (this is a big reason you see [] / only 'y' in weird cases)
-  const axisNameByRid = new Map()
-  for (const [rid, arr] of parsed.axesByReport.entries()) {
-    axisNameByRid.set(rid, new Set((arr || []).map(a => a && a.name).filter(Boolean)))
-  }
-
-  // ✅ FIX: warmup uses REAL axes list across ALL RIDs, but stores per-device usable axes by UNIQUE name
+  // ✅ WARMUP FIX (the important part):
+  // 1) Prefer axes that actually MOVED during warmup (span > WARMUP_EPS)
+  // 2) If nothing moved (user didn't touch anything), do NOT return [] and do NOT return x,y,z junk
+  //    Instead pick ONE best axis as a safe fallback
   function persistUsableAxesOnce() {
     if (usableAxesPersisted) return
     if (warmupStartedAt === 0) return
     const age = Date.now() - warmupStartedAt
     if (age < WARMUP_MS) return
 
-    const usableSet = new Set()
-    const usableNow = []
-
+    const candidatesByName = new Map() // name -> { name, span, range }
     for (const list of parsed.axesByReport.values()) {
       for (const ax of list) {
         if (!ax || !ax.name) continue
@@ -1151,27 +1138,42 @@ function startInputLoggerForDevice(d, parsed) {
         const seen = axisSeen.get(k) || 0
         if (seen < WARMUP_MIN_SAMPLES) continue
 
-        // ✅ FIX #1: "usable" means "exists + we observed it" (not "moved")
-        // This prevents [] unless the user wiggles during warmup.
-        if (!usableSet.has(ax.name)) {
-          usableSet.add(ax.name)
-          usableNow.push(ax.name)
+        const mn = axisMin.get(k)
+        const mx = axisMax.get(k)
+        const span = Math.abs((mx ?? 0) - (mn ?? 0))
+        const range = Math.abs((ax.logicalMax ?? 0) - (ax.logicalMin ?? 0))
+
+        const prev = candidatesByName.get(ax.name)
+        if (!prev || span > prev.span) {
+          candidatesByName.set(ax.name, { name: ax.name, span, range })
         }
       }
     }
 
-    // If *nothing* met sample requirements, fall back to "all non-hat axes in descriptor"
-    // (prevents empty axes list on quiet devices / no input during first 2s)
+    const uniq = Array.from(candidatesByName.values())
+
+    // Prefer moved axes
+    let usableNow = uniq
+      .filter(c => c.span > WARMUP_EPS)
+      .sort((a, b) => b.span - a.span)
+      .map(c => c.name)
+
+    // Fallback: pick ONE best axis if nothing moved
+    if (!usableNow.length && uniq.length) {
+      uniq.sort((a, b) => (b.span - a.span) || (b.range - a.range))
+      usableNow = [uniq[0].name]
+    }
+
+    // Last-resort fallback: if we somehow still have none (eg no samples), pick first descriptor axis (non-hat)
     if (!usableNow.length) {
       for (const list of parsed.axesByReport.values()) {
         for (const ax of list) {
           if (!ax || !ax.name) continue
           if (isHatAxis(ax.usagePage, ax.usage, ax.name)) continue
-          if (!usableSet.has(ax.name)) {
-            usableSet.add(ax.name)
-            usableNow.push(ax.name)
-          }
+          usableNow = [ax.name]
+          break
         }
+        if (usableNow.length) break
       }
     }
 
@@ -1179,7 +1181,7 @@ function startInputLoggerForDevice(d, parsed) {
 
     if (usableNow.length) {
       setDeviceUsableAxes(d, usableNow)
-      // ✅ IMPORTANT: do NOT call initializeUI here (your note)
+      // do NOT call initializeUI here (per your note)
     }
 
     usableAxesPersisted = true
@@ -1236,7 +1238,7 @@ function startInputLoggerForDevice(d, parsed) {
       axisSeen.set(outKey, (axisSeen.get(outKey) || 0) + 1)
     }
 
-    // ✅ FIX #2: warmup persistence happens once, never blocks input
+    // ✅ warmup persistence happens once, never blocks input
     persistUsableAxesOnce()
 
     // Buttons
@@ -1392,6 +1394,7 @@ function startInputLoggerForDevice(d, parsed) {
     message: `Input-Detection: ${prefix} listeners attached (data=${device.listenerCount('data')} error=${device.listenerCount('error')})`
   })
 }
+
 
 
 //VERY FIRST TIME RUN ONLY!!!!
