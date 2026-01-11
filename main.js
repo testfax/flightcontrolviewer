@@ -119,7 +119,7 @@ function main() {
     }
 
 
-    logs("=FLIGHT CONTROL VIEWER= START".green,"isPackaged:".yellow,`${JSON.stringify(app.isPackaged,null,2)}`.cyan, "Version:".yellow,`${JSON.stringify(app.getVersion(),null,2)}`.cyan)
+    logs_debug("=FLIGHT CONTROL VIEWER= START".green,"isPackaged:".yellow,`${JSON.stringify(app.isPackaged,null,2)}`.cyan, "Version:".yellow,`${JSON.stringify(app.getVersion(),null,2)}`.cyan)
     const { mainMenu,rightClickMenu } = require('./menumaker')
     nativeTheme.themeSource = electronWindowIds.get('theme')
 
@@ -216,12 +216,37 @@ function main() {
       }
     }
 
-    app.on('window-all-closed', () =>{
-      logs("=FLIGHT CONTROL VIEWER= CLOSED".red,"isPackaged:".yellow,`${JSON.stringify(app.isPackaged,null,2)}`.cyan, "Version:".yellow,`${JSON.stringify(app.getVersion(),null,2)}`.cyan)
-      // logs(`App Quit`.red)
-      if (process.platform !== 'darwin') app.quit()
-      return
+
+    //Closed app handling and log flushing
+    const log = require('electron-log')
+    let quitLoggedOnce = false
+    async function flushLogs() {
+      // give remote transport a moment to run
+      await new Promise(r => setTimeout(r, 200))
+
+      // flush file transport if available
+      try {
+        if (log?.transports?.file?.flush) log.transports.file.flush()
+      } catch (e) {}
+    }
+    app.on('before-quit', async (e) => {
+      if (quitLoggedOnce) return
+      quitLoggedOnce = true
+
+      // pause shutdown so logs can actually write
+      e.preventDefault()
+
+      try {
+        await logs_debug("=FLIGHT CONTROL VIEWER= CLOSED".red, "Version:".yellow, app.getVersion())
+        await flushLogs()
+      } catch (err) {
+        // last resort: don't block quitting forever
+      }
+
+      // continue shutdown
+      app.quit()
     })
+
     process.on('uncaughtException', (error,origin) => {
       logs_error(error,origin,error.stack)
       //  logs('ReferenceError occurred:'.red, error.stack);

@@ -96,7 +96,7 @@ try {
   ipcRenderer.on('from_brain-detection-ready', async package => {
     const thisDeviceEl = document.getElementById('thisDevice')
         if (thisDeviceEl) {
-          thisDeviceEl.innerText = "Devices Shown Below"
+          thisDeviceEl.innerText = "Running Log..."
         }
   })
   ipcRenderer.on('from_brain-detection', package => {
@@ -104,14 +104,30 @@ try {
     const el = document.getElementById('log')
     if (!el) return
 
+    // Detect the real scroller: if el doesn't scroll, fall back to the page
+    const scroller =
+      (el.scrollHeight > el.clientHeight ? el : document.scrollingElement || document.documentElement)
+
+    // Only autoscroll if user is already near the bottom
+    const nearBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 40
+
     delete package.keybindArticulation
     ipcRenderer.send('renderer-response-showSetupLog', package)
+
     let msg = package?.message
     if (msg == null) msg = package
     if (typeof msg !== 'string') msg = JSON.stringify(msg, null, 2)
 
     if (el.textContent && !el.textContent.endsWith('\n')) el.textContent += '\n'
     el.textContent += msg + '\n'
+
+    if (nearBottom) {
+      // Do it twice: once immediately, once after layout
+      scroller.scrollTop = scroller.scrollHeight
+      requestAnimationFrame(() => {
+        scroller.scrollTop = scroller.scrollHeight
+      })
+    }
   } catch (err) {
     ipcRenderer.send(
       'renderer-response-unhandled-error',
@@ -121,7 +137,10 @@ try {
   }
 })
 
-} catch (err) {
+
+
+} 
+catch (err) {
   console.log('ipcMAIN', err)
   if (window.ipcRenderer) window.ipcRenderer.send('renderer-response-unhandled-error', serializeError(err), location)
 }

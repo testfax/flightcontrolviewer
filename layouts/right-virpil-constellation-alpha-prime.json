@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "device": {
-    "grip": "VPC Constellation ALPHA",
+    "grip": "VPC Constellation ALPHA Prime",
     "hand": "R",
     "product": "R-VPC Stick WarBRD-D",
     "vid": "0",
@@ -9,7 +9,7 @@
   },
   "overlays": {
     "main": {
-      "image": "right-virpil-constellation-alpha.png",
+      "image": "right-virpil-constellation-alpha-prime.png",
       "sheet": { "w": 1170, "h": 1000 },
       "viewBox": "0 0 1170 1000"
     }

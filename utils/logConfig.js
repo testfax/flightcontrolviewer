@@ -327,7 +327,7 @@ try {
                     if (item && typeof item === 'object') return colorizeAny(item)
                     return item
                 }).join(' ')
-                log.info(logMessage)
+                log.error(logMessage)
             }
         },
         logs_debug: async (...input) => {
