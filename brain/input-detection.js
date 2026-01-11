@@ -14,7 +14,7 @@ const staticData = require('../staticData.json')
 const fs = require('fs')
 const path = require('path')
 const { pathToFileURL } = require('url')
-const colors = require('colors')  
+const colors = require('colors')
 
 function toHex4(n) {
   return Number(n).toString(16).toUpperCase().padStart(4, '0')
@@ -177,6 +177,7 @@ function extractDescriptorBufferFromDump(dumpText, d) {
 
   return { ok: 1, reason: `path-based extraction (headerLine=${headerIndex})`, buf: hexPartsToBuffer(bytes) }
 }
+
 // ---------- Bit helpers ----------
 function readBitsAsUnsignedLE(buf, bitOffset, bitSize) {
   let value = 0
@@ -556,12 +557,6 @@ function hatValueToDirs(v) {
 }
 
 function startInputLoggerForDevice(d, parsed) {
-  correctControls()
-  let packetCount = 0
-  let lastPacketAt = 0
-  let debugPacketCount = 0
-  const DEBUG_FIRST_PACKETS = 10
-
   const prefix = jsPrefixForDevice(d)
   let device = null
   try {
@@ -570,10 +565,6 @@ function startInputLoggerForDevice(d, parsed) {
     logs_error(prefix + 'open_failed', d.path)
     return
   }
-
-  const warmed = new Set()
-  const warmupCount = new Map()        // rid -> packets processed during warmup
-  const warmupInitialized = new Set()  // rid -> we did one-time init for this rid
 
   const lastButtons = new Map()
 
@@ -589,15 +580,14 @@ function startInputLoggerForDevice(d, parsed) {
   // Hat tracking for virtual buttons (per hat name)
   const hatLastDirs = new Map() // hatOutPrefix -> {up,right,down,left,neutral}
 
-  // NEW: track which axes actually move during warmup so vendor "dead" axes (like VKB y/z) can be ignored
+  // warmup sampling (UI only; NEVER blocks reporting)
   const axisMin = new Map() // outKey -> min observed
   const axisMax = new Map() // outKey -> max observed
   const axisSeen = new Map() // outKey -> samples
-  const axisUsable = new Map() // outKey -> boolean
-
-  // ✅ tuned for VKB pedals: more samples, smaller epsilon
-  const WARMUP_SAMPLES = 40
+  const WARMUP_MS = 2000
   const WARMUP_EPS = 8
+  const WARMUP_MIN_SAMPLES = 8
+  let warmupStartedAt = 0
   let usableAxesPersisted = false
 
   // suppress repeats if the exact same control was the last one reported
@@ -611,11 +601,7 @@ function startInputLoggerForDevice(d, parsed) {
   const MOVE_PERCENT = 0.02
   const AXIS_COOLDOWN_MS = 1000
 
-  // ------------------------------------------------------------
-  // SINGLE-AXIS EXCEPTION:
-  // If this device only has 1 axis total (excluding hats), allow repeating that axis
-  // even if it was the lastReported control.
-  // ------------------------------------------------------------
+  // SINGLE-AXIS EXCEPTION (do not change behavior; just keep your existing logic)
   const axisNames = new Set()
   for (const list of parsed.axesByReport.values()) {
     for (const a of list) {
@@ -623,16 +609,16 @@ function startInputLoggerForDevice(d, parsed) {
     }
   }
   const isSingleAxisDevice = axisNames.size === 1
-  const singleAxisOutKey = isSingleAxisDevice
-    ? `${prefix}axis_${Array.from(axisNames)[0]}`
-    : null
+  let singleAxisOutKey = null
+  if (isSingleAxisDevice) {
+    singleAxisOutKey = `${prefix}axis_${Array.from(axisNames)[0]}`
+  }
 
-  // ✅ warn once per unexpected RID per device
+  // warn once per unexpected RID per device
   const unknownRidWarned = new Set()
 
   function reportOnce(keyStr) {
     if (keyStr === lastReported) {
-      // only bypass "same as lastReported" for the single axis on single-axis devices
       if (!(isSingleAxisDevice && keyStr === singleAxisOutKey)) return false
     }
     lastReported = keyStr
@@ -642,11 +628,8 @@ function startInputLoggerForDevice(d, parsed) {
   device.on('data', (data) => {
     let rid = 0
     let payload = data
-    
-    // ============================================================
-    // ✅ FIX: handle devices/driver stacks that DO NOT include the
-    // report-id byte in the data stream (common with some HID paths)
-    // ============================================================
+
+    // ✅ FIX: handle devices/driver stacks that DO NOT include the report-id byte
     if (parsed.hasReportIds) {
       const ridCandidate = data[0]
 
@@ -654,14 +637,12 @@ function startInputLoggerForDevice(d, parsed) {
         parsed.buttonsByReport.has(ridCandidate) || parsed.axesByReport.has(ridCandidate)
 
       if (hasRidCandidate) {
-        // normal case: first byte is report id
         rid = ridCandidate
         payload = data.slice(1)
       } else {
         const hasRid1 = parsed.buttonsByReport.has(1) || parsed.axesByReport.has(1)
         const hasRid0 = parsed.buttonsByReport.has(0) || parsed.axesByReport.has(0)
 
-        // if our parsed descriptor only defines rid=1, treat this packet as rid=1
         if (hasRid1 && !hasRid0) {
           rid = 1
           payload = data
@@ -677,7 +658,6 @@ function startInputLoggerForDevice(d, parsed) {
             })
           }
         } else {
-          // fallback: old behavior
           rid = 0
           payload = data
 
@@ -699,130 +679,82 @@ function startInputLoggerForDevice(d, parsed) {
         }
       }
     }
-    // ============================================================
 
     const buttons = parsed.buttonsByReport.get(rid) || []
     const axes = parsed.axesByReport.get(rid) || []
     if (!buttons.length && !axes.length) return
 
-    // ============================================================
-    // ✅ FIX: warmup must run for MANY packets, not just one.
-    // Your old code did warmed.add(rid) on the first packet, which
-    // prevented axisSeen from ever reaching WARMUP_SAMPLES.
-    // ============================================================
-    if (!warmed.has(rid)) {
-      const n0 = warmupCount.get(rid) || 0
-      const n = n0 + 1
-      warmupCount.set(rid, n)
-
-      // One-time init for this rid
-      if (!warmupInitialized.has(rid)) {
-        for (const b of buttons) {
-          lastButtons.set(`${rid}:${b.usage}`, readButtonBit(payload, b.bitOffset))
-        }
-
-        for (const a of axes) {
-          const outKey = `${prefix}axis_${a.name}`
-
-          const rawU = readBitsAsUnsignedLE(payload, a.bitOffset, a.bitSize)
-          let val = rawU
-          if (a.logicalMin < 0) val = toSigned(rawU, a.bitSize)
-
-          axisLastVal.set(outKey, val)
-          axisActive.set(outKey, false)
-          axisLastEmit.set(outKey, 0)
-
-          // init hat virtual directions (and don't treat hat as analog axis)
-          if (isHatAxis(a.usagePage, a.usage, a.name)) {
-            const hatBase = `${prefix}${a.name}`
-            hatLastDirs.set(hatBase, hatValueToDirs(val))
-            continue
-          }
-
-          // learn rotx/roty "home" (resting center) from first warmup value
-          if (a.name === 'rotx' || a.name === 'roty') {
-            rotHome.set(outKey, val)
-            rotArmed.set(outKey, true)
-          }
-
-          axisMin.set(outKey, val)
-          axisMax.set(outKey, val)
-          axisSeen.set(outKey, 0)
-        }
-
-        if (axes.length) {
-          const names = axes.map(x => x.name).join(',')
-          if (showConsoleMessages) console.log(prefix + `axes_rid${rid}=` + names, 'loaded'.green)
-          logs('[BRAIN]'.bgCyan, 'input-detection'.yellow, prefix + `axes_rid${rid}=` + names, 'loaded'.green)
-          blastToUI(package = {
-            ...data = { message: `Input-Detection: ${prefix} + axes_rid${rid}=${names}, 'loaded'` },
-            ...{ receiver: "from_brain-detection" },
-          })
-        }
-
-        warmupInitialized.add(rid)
+    // Lazily init baseline states (NO "warmup return" gating)
+    for (const b of buttons) {
+      const k = `${rid}:${b.usage}`
+      if (!lastButtons.has(k)) {
+        lastButtons.set(k, readButtonBit(payload, b.bitOffset))
       }
-
-      // Every warmup packet: update min/max/seen so usable axes can be detected
-      for (const a of axes) {
-        const outKey = `${prefix}axis_${a.name}`
-
-        const rawU = readBitsAsUnsignedLE(payload, a.bitOffset, a.bitSize)
-        let val = rawU
-        if (a.logicalMin < 0) val = toSigned(rawU, a.bitSize)
-
-        // keep last value up to date even during warmup
-        axisLastVal.set(outKey, val)
-
-        // Hats: keep their state, but don't include in usable axis logic
-        if (isHatAxis(a.usagePage, a.usage, a.name)) {
-          const hatBase = `${prefix}${a.name}`
-          hatLastDirs.set(hatBase, hatValueToDirs(val))
-          continue
-        }
-
-        const min0 = axisMin.get(outKey)
-        const max0 = axisMax.get(outKey)
-        axisMin.set(outKey, (min0 == null) ? val : Math.min(min0, val))
-        axisMax.set(outKey, (max0 == null) ? val : Math.max(max0, val))
-        axisSeen.set(outKey, (axisSeen.get(outKey) || 0) + 1)
-
-        if ((axisSeen.get(outKey) || 0) >= WARMUP_SAMPLES) {
-          const mn = axisMin.get(outKey)
-          const mx = axisMax.get(outKey)
-          const span = Math.abs((mx ?? 0) - (mn ?? 0))
-          axisUsable.set(outKey, span > WARMUP_EPS)
-        }
-      }
-
-      // Only after enough warmup packets: persist usable axes and exit warmup
-      if (n >= WARMUP_SAMPLES) {
-        if (!usableAxesPersisted) {
-          const usableNow = []
-          for (const a of axes) {
-            if (isHatAxis(a.usagePage, a.usage, a.name)) continue
-
-            const outKey = `${prefix}axis_${a.name}`
-            const seen = axisSeen.get(outKey) || 0
-            if (seen < WARMUP_SAMPLES) continue
-
-            const ok = axisUsable.get(outKey)
-            if (ok === true) usableNow.push(a.name)
-          }
-
-          if (usableNow.length) {
-            setDeviceUsableAxes(d, usableNow)
-            usableAxesPersisted = true
-            initializeUI(getDevicesStore(), "from_brain-detection-initialize")
-          }
-        }
-
-        warmed.add(rid)
-      }
-
-      return
     }
-    // ============================================================
+
+    // Warmup sampling (UI only) + lazy init
+    for (const a of axes) {
+      const outKey = `${prefix}axis_${a.name}`
+
+      const rawU = readBitsAsUnsignedLE(payload, a.bitOffset, a.bitSize)
+      let val = rawU
+      if (a.logicalMin < 0) val = toSigned(rawU, a.bitSize)
+
+      if (!axisLastVal.has(outKey)) axisLastVal.set(outKey, val)
+      if (!axisActive.has(outKey)) axisActive.set(outKey, false)
+      if (!axisLastEmit.has(outKey)) axisLastEmit.set(outKey, 0)
+
+      // init hat virtual directions
+      if (isHatAxis(a.usagePage, a.usage, a.name)) {
+        const hatBase = `${prefix}${a.name}`
+        if (!hatLastDirs.has(hatBase)) hatLastDirs.set(hatBase, hatValueToDirs(val))
+        continue
+      }
+
+      // learn rotx/roty home (first seen value)
+      if (a.name === 'rotx' || a.name === 'roty') {
+        if (!rotHome.has(outKey)) rotHome.set(outKey, val)
+        if (!rotArmed.has(outKey)) rotArmed.set(outKey, true)
+      }
+
+      if (warmupStartedAt === 0) warmupStartedAt = Date.now()
+
+      const min0 = axisMin.get(outKey)
+      const max0 = axisMax.get(outKey)
+      axisMin.set(outKey, (min0 == null) ? val : Math.min(min0, val))
+      axisMax.set(outKey, (max0 == null) ? val : Math.max(max0, val))
+      axisSeen.set(outKey, (axisSeen.get(outKey) || 0) + 1)
+    }
+
+    // After WARMUP_MS, persist usable axes for UI (never blocks input)
+    if (!usableAxesPersisted && warmupStartedAt !== 0) {
+      const age = Date.now() - warmupStartedAt
+      if (age >= WARMUP_MS) {
+        const usableNow = []
+
+        for (const list of parsed.axesByReport.values()) {
+          for (const ax of list) {
+            if (isHatAxis(ax.usagePage, ax.usage, ax.name)) continue
+
+            const k = `${prefix}axis_${ax.name}`
+            const seen = axisSeen.get(k) || 0
+            if (seen < WARMUP_MIN_SAMPLES) continue
+
+            const mn = axisMin.get(k)
+            const mx = axisMax.get(k)
+            const span = Math.abs((mx ?? 0) - (mn ?? 0))
+            if (span > WARMUP_EPS) usableNow.push(ax.name)
+          }
+        }
+
+        if (usableNow.length) {
+          setDeviceUsableAxes(d, usableNow)
+          initializeUI(getDevicesStore(), "from_brain-detection-initialize")
+        }
+
+        usableAxesPersisted = true
+      }
+    }
 
     // Buttons
     for (const b of buttons) {
@@ -851,16 +783,15 @@ function startInputLoggerForDevice(d, parsed) {
       let val = rawU
       if (a.logicalMin < 0) val = toSigned(rawU, a.bitSize)
 
-      // ✅ Hat Switch handling: emit virtual buttons instead of treating as analog axis
+      // Hat -> virtual buttons
       if (isHatAxis(a.usagePage, a.usage, a.name)) {
         axisLastVal.set(out, val)
         axisActive.set(out, false)
 
-        const hatBase = `${prefix}${a.name}` // ✅ js1_hat1
+        const hatBase = `${prefix}${a.name}`
         const prevDirs = hatLastDirs.get(hatBase) || { up: 0, right: 0, down: 0, left: 0, neutral: 1 }
         const nowDirs = hatValueToDirs(val)
 
-        // emit only on transitions to pressed directions
         const map = [
           ['up', `${hatBase}_up`],
           ['right', `${hatBase}_right`],
@@ -868,7 +799,9 @@ function startInputLoggerForDevice(d, parsed) {
           ['left', `${hatBase}_left`]
         ]
 
-        for (const [k, outKey] of map) {
+        for (const pair of map) {
+          const k = pair[0]
+          const outKey = pair[1]
           const was = prevDirs[k] === 1
           const is = nowDirs[k] === 1
           if (is && !was) {
@@ -881,11 +814,6 @@ function startInputLoggerForDevice(d, parsed) {
         }
 
         hatLastDirs.set(hatBase, nowDirs)
-        continue
-      }
-
-      // ignore "dead" axes detected during warmup (common for VKB pedals showing x,y,z)
-      if (axisUsable.has(out) && axisUsable.get(out) === false) {
         continue
       }
 
@@ -909,7 +837,7 @@ function startInputLoggerForDevice(d, parsed) {
 
       const buttonCooldownActive = (now - lastButtonAt) < AXIS_BLOCK_AFTER_BUTTON_MS
 
-      // ---- rotx/roty must hit >50% throw, then return within 10% to re-arm ----
+      // rotx/roty gating
       const isRot = (a.name === 'rotx' || a.name === 'roty')
       if (isRot) {
         const home = rotHome.get(out)
@@ -922,21 +850,18 @@ function startInputLoggerForDevice(d, parsed) {
           let armed = rotArmed.get(out)
           if (armed == null) armed = true
 
-          // locked: only re-arm when back within 10% of home
           if (!armed) {
             if (rotDelta <= withinTen) rotArmed.set(out, true)
             axisActive.set(out, isActive)
             continue
           }
 
-          // armed: only allow any reporting once past 50% from home
           if (rotDelta < halfThrow) {
             axisActive.set(out, isActive)
             continue
           }
         }
       }
-      // -----------------------------------------------------------------------
 
       if (init == 0 && !buttonCooldownActive) {
         if (!wasActive && isActive) {
@@ -950,7 +875,6 @@ function startInputLoggerForDevice(d, parsed) {
             gatherAfterDeviceInputs(out, d)
           }
 
-          // lock rotx/roty ONLY when we actually trigger (red path)
           if (a.name === 'rotx' || a.name === 'roty') {
             rotArmed.set(out, false)
           }
@@ -980,7 +904,6 @@ function startInputLoggerForDevice(d, parsed) {
     product: d.product
   })
 
-  // optional: also send to UI so you see it even if console is hidden
   blastToUI({
     receiver: 'from_brain-detection',
     message: `Input-Detection: ${prefix} listeners attached (data=${device.listenerCount('data')} error=${device.listenerCount('error')})`
@@ -1014,7 +937,6 @@ function gatherAfterDeviceInputs(data, d) {
     result = findKeybind(`${joyInfo[0]}_${joyInfo[2]}`, actionmaps.get('discoveredKeybinds'))
   }
   else if (String(joyInfo[1] || '').startsWith('hat')) {
-    // js1_hat1_up -> js1_hat1_up
     result = findKeybind(`${joyInfo[0]}_${joyInfo[1]}_${joyInfo[2]}`, actionmaps.get('discoveredKeybinds'))
   }
   else {
@@ -1135,6 +1057,13 @@ async function main() {
     return
   }
 
+  // ✅ IMPORTANT: reorder prefixes ONCE before attaching listeners (prevents mid-stream prefix changes)
+  try {
+    correctControls()
+  } catch (e) {
+    // don't brick startup if actionmaps aren't ready yet
+  }
+
   const dumpStatus = deviceInfo.get('hidDescriptorDumpStatus')
   const dumpText = deviceInfo.get('hidDescriptorDump')
   const dumpAvailable = (dumpStatus && dumpStatus.ok === 1 && dumpText)
@@ -1202,7 +1131,7 @@ async function main() {
     if (page == 'joyview') startInputLoggerForDevice(d, learned)
   }
 
-  if (page == 'joyview') { initializeUI(getDevicesStore(), "from_brain-detection-initialize") }
+  // if (init == 0 && page == 'joyview') { initializeUI(getDevicesStore(), "from_brain-detection-initialize") }
   if (page == 'setup') { setupUI(getDevicesStore(), "from_brain-detection") }
 }
 function initializeUI(data, receiver) {
@@ -1226,7 +1155,6 @@ function initializeUI(data, receiver) {
         }
       }
 
-      // ✅ prefer persisted "usableAxes" (true live) when available
       const persistedUsable = data[item].usableAxes
       if (Array.isArray(persistedUsable) && persistedUsable.length) {
         package[prod].axes = persistedUsable
@@ -1234,7 +1162,6 @@ function initializeUI(data, receiver) {
         package[prod].axes = collectAllAxisNamesFromPlain(parsed)
       }
 
-      // expose hats separately so UI can show them distinctly
       const byRid = parsed && parsed.axesByReport ? parsed.axesByReport : {}
       const hats = new Set()
       for (const ridStr of Object.keys(byRid)) {
@@ -1259,11 +1186,11 @@ function initializeUI(data, receiver) {
     blastToUI(sortedPackage)
     logs_warn(pkg)
     setTimeout(() => {
-    init = 0
-    const package = { receiver: "from_brain-detection-ready", data: 1 }
-    blastToUI(package)
-    logs('=== Ready to Receive Inputs ==='.green)
-  }, 2000)
+      init = 0
+      const package = { receiver: "from_brain-detection-ready", data: 1 }
+      blastToUI(package)
+      logs('=== Ready to Receive Inputs ==='.green)
+    }, 2000)
   }
 }
 function setupUI(data, receiver) {
@@ -1291,7 +1218,6 @@ function setupUI(data, receiver) {
       }
     }
 
-    // ✅ prefer persisted "usableAxes" (true live) when available
     const persistedUsable = data[item].usableAxes
     if (Array.isArray(persistedUsable) && persistedUsable.length) {
       byProd[prod].axes = persistedUsable
@@ -1329,7 +1255,7 @@ function setupUI(data, receiver) {
   init = 0
   const package = { receiver: "from_brain-detection-ready", data: 1 }
   blastToUI(package)
-  console.log('=== Ready to Receive Inputs ==='.green)
+  logs('=== Ready to Receive Inputs ==='.green)
 }
 function resolveLayoutsDir(app, path) {
   return path.join(app.getAppPath(), 'layouts')
@@ -1470,14 +1396,6 @@ ipcMain.on('changePage', async (receivedData) => {
       logs_error(error.stack)
     }
     initializeUI(getDevicesStore(), "from_brain-detection-initialize")
-
-    setTimeout(() => {
-      init = 0
-      const package = { receiver: "from_brain-detection-ready", data: 1 }
-      blastToUI(package)
-      console.log('=== Ready to Receive Inputs ==='.green)
-    }, 2000)
-
   }, 300)
 })
 ipcMain.on('initializer-response', (event, message) => {
