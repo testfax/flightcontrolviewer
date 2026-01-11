@@ -104,8 +104,9 @@ try {
     const el = document.getElementById('log')
     if (!el) return
 
+    delete package.keybindArticulation
+    ipcRenderer.send('renderer-response-showSetupLog', package)
     let msg = package?.message
-
     if (msg == null) msg = package
     if (typeof msg !== 'string') msg = JSON.stringify(msg, null, 2)
 

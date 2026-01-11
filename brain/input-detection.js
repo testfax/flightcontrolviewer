@@ -64,6 +64,20 @@ function jsPrefixForDevice(d) {
   const idx = getOrAssignJsIndexForKey(key)
   return `js${idx}_`
 }
+
+// ✅ Persist "true live" axes detected during warmup so UI can show only real axes
+function setDeviceUsableAxes(d, axisNames) {
+  const key = deviceKeyFromHidInfo(d)
+  const devices = getDevicesStore()
+  if (!devices[key]) return
+
+  const uniq = Array.from(new Set(axisNames)).filter(Boolean)
+  devices[key].usableAxes = uniq
+  devices[key].usableAxesSavedAt = Math.floor(Date.now() / 1000)
+
+  setDevicesStore(devices)
+}
+
 // ---------- dump parsing / descriptor extraction ----------
 function parseAllHexBytesFromLine(line) {
   const m = String(line).match(/\b[0-9a-fA-F]{2}\b/g)
@@ -187,8 +201,6 @@ function toSigned(valueUnsigned, bitSize) {
 // HID Usage naming
 // ------------------------------
 function usageName(usagePage, usage) {
-  logs('[usageName]'.bgBlue, 'input-detection'.yellow, `usagePage=${usagePage.toString(16)}, usage=${usage.toString(16)}`)
-
   if (usagePage === 0x01) {
     switch (usage) {
       case 0x30: return 'x'
@@ -573,8 +585,11 @@ function startInputLoggerForDevice(d, parsed) {
   const axisMax = new Map() // outKey -> max observed
   const axisSeen = new Map() // outKey -> samples
   const axisUsable = new Map() // outKey -> boolean
-  const WARMUP_SAMPLES = 25
-  const WARMUP_EPS = 16 // tweak if needed per device resolution
+
+  // ✅ tuned for VKB pedals: more samples, smaller epsilon
+  const WARMUP_SAMPLES = 40
+  const WARMUP_EPS = 8
+  let usableAxesPersisted = false
 
   // suppress repeats if the exact same control was the last one reported
   let lastReported = ''
@@ -693,6 +708,28 @@ function startInputLoggerForDevice(d, parsed) {
         }
       }
 
+      // ✅ After enough samples, persist which axes actually move so UI shows the "true live" set
+      if (!usableAxesPersisted) {
+        const usableNow = []
+
+        for (const a of axes) {
+          if (isHatAxis(a.usagePage, a.usage, a.name)) continue
+
+          const outKey = `${prefix}axis_${a.name}`
+          const seen = axisSeen.get(outKey) || 0
+          if (seen < WARMUP_SAMPLES) continue
+
+          const ok = axisUsable.get(outKey)
+          if (ok === true) usableNow.push(a.name)
+        }
+
+        if (usableNow.length) {
+          setDeviceUsableAxes(d, usableNow)
+          usableAxesPersisted = true
+          initializeUI(getDevicesStore(), "from_brain-detection-initialize")
+        }
+      }
+
       if (axes.length) {
         const names = axes.map(x => x.name).join(',')
         if (showConsoleMessages) console.log(prefix + `axes_rid${rid}=` + names, 'loaded'.green)
@@ -719,7 +756,6 @@ function startInputLoggerForDevice(d, parsed) {
         const out = `${prefix}button${b.usage}`
         if (reportOnce(out)) {
           if (showConsoleMessages) console.log(out.blue)
-          logs_debug('[BRAIN]'.bgMagenta, 'input-detection'.cyan, out)
           gatherAfterDeviceInputs(out, d)
         }
       }
@@ -759,7 +795,6 @@ function startInputLoggerForDevice(d, parsed) {
             lastButtonAt = Date.now()
             if (reportOnce(outKey)) {
               if (showConsoleMessages) console.log(outKey.blue)
-              logs_debug('[BRAIN]'.bgMagenta, 'input-detection'.cyan, outKey)
               gatherAfterDeviceInputs(outKey, d)
             }
           }
@@ -827,13 +862,11 @@ function startInputLoggerForDevice(d, parsed) {
         if (!wasActive && isActive) {
           if (reportOnce(out)) {
             if (showConsoleMessages) console.log(out.cyan)
-            logs_debug('[BRAIN]'.bgMagenta, 'input-detection'.cyan, out)
           }
           axisLastEmit.set(out, now)
         } else if (movedEnough && (now - lastEmit) >= AXIS_COOLDOWN_MS) {
           if (reportOnce(out)) {
             if (showConsoleMessages) console.log(out.red)
-            logs_debug('[BRAIN]'.bgMagenta, 'input-detection'.cyan, out)
             gatherAfterDeviceInputs(out, d)
           }
 
@@ -881,6 +914,7 @@ function pidVidFromHidPath(path) {
 }
 function gatherAfterDeviceInputs(data, d) {
   const joyInfo = data.split('_')
+  logs('[BRAIN]'.bgCyan, 'input-detection'.yellow, 'joyInfo'.cyan, joyInfo)
   let result
 
   if (joyInfo[1] == 'axis') {
@@ -894,7 +928,6 @@ function gatherAfterDeviceInputs(data, d) {
     result = findKeybind(`${joyInfo[0]}_${joyInfo[1]}`, actionmaps.get('discoveredKeybinds'))
   }
 
-  // console.log(d)
   const deviceSpecs = {
     key: pidVidFromHidPath(d.path),
     joyInput: data,
@@ -906,7 +939,6 @@ function gatherAfterDeviceInputs(data, d) {
     prefix: joyInfo[0],
     keybindArticulation: staticData.keybindArticulation
   }
-  // console.log("deviceSpecs:".yellow,deviceSpecs.key)
 
   joySubmit(deviceSpecs)
 }
@@ -951,7 +983,6 @@ function correctControls() {
         }
 
         if (showConsoleMessages) { console.log('Devices Reordered...'.green, devices[deviceKey].product, devices[deviceKey].prefix, devices[deviceKey].jsIndex) }
-        // logs('[BRAIN]'.bgCyan, 'input-detection'.yellow, 'Devices Reordered...'.green, devices[deviceKey].product, devices[deviceKey].prefix, devices[deviceKey].jsIndex)
         devices[deviceKey].savedAt = Math.floor(Date.now() / 1000)
       }
     }
@@ -965,13 +996,10 @@ function joySubmit(data) {
     ...data,
     ...{ receiver: "from_brain-detection" },
   }
-  // console.log("package:".yellow,package)
   blastToUI(package)
 }
 
 // Collect ALL buttons across all report IDs (instead of only report '1')
-// Optional: cap to avoid wild "range buttons" from vendors that declare 128+ but only a subset actually changes.
-// You can raise/lower this cap or remove it once you validate real button bits.
 function countAllButtonsFromPlain(parsedInputs) {
   const byRid = parsedInputs && parsedInputs.buttonsByReport ? parsedInputs.buttonsByReport : {}
   let count = 0
@@ -1081,7 +1109,6 @@ async function main() {
     if (page == 'joyview') startInputLoggerForDevice(d, learned)
   }
 
-  // ✅ fix accidental assignment (=) -> comparison (==)
   if (page == 'joyview') { initializeUI(getDevicesStore(), "from_brain-detection-initialize") }
   if (page == 'setup') { setupUI(getDevicesStore(), "from_brain-detection") }
 }
@@ -1100,15 +1127,19 @@ function initializeUI(data, receiver) {
           pid: data[item].productId,
           prefix: data[item].prefix.split("_")[0],
           position: data[item].jsIndex,
-          // ✅ count all reports, not just '1'
           buttons: countAllButtonsFromPlain(data[item].parsedInputs),
           axes: [],
           hats: []
         }
       }
 
-      // ✅ collect all report IDs, not just '1'
-      package[prod].axes = collectAllAxisNamesFromPlain(parsed)
+      // ✅ prefer persisted "usableAxes" (true live) when available
+      const persistedUsable = data[item].usableAxes
+      if (Array.isArray(persistedUsable) && persistedUsable.length) {
+        package[prod].axes = persistedUsable
+      } else {
+        package[prod].axes = collectAllAxisNamesFromPlain(parsed)
+      }
 
       // expose hats separately so UI can show them distinctly
       const byRid = parsed && parsed.axesByReport ? parsed.axesByReport : {}
@@ -1134,11 +1165,17 @@ function initializeUI(data, receiver) {
     }
     blastToUI(sortedPackage)
     logs_warn(pkg)
+    setTimeout(() => {
+      init = 0
+      const package = { receiver: "from_brain-detection-ready", data: 1 }
+      blastToUI(package)
+      logs('=== Ready to Receive Inputs ==='.green)
+    }, 2000)
   }
 }
 function setupUI(data, receiver) {
   if (windowItemsStore.get('currentPage') !== 'setup') return
-
+  logs('[BRAIN]'.bgCyan, 'input-detection'.yellow, 'Clicked Setup Page'.green)
   const byProd = {}
 
   for (const item in data) {
@@ -1155,15 +1192,19 @@ function setupUI(data, receiver) {
         pid: data[item].productId,
         prefix: String(data[item].prefix).split('_')[0],
         position: data[item].jsIndex,
-        // ✅ count all reports, not just '1'
         buttons: countAllButtonsFromPlain(parsed),
         axes: [],
         hats: []
       }
     }
 
-    // ✅ collect all report IDs, not just '1'
-    byProd[prod].axes = collectAllAxisNamesFromPlain(parsed)
+    // ✅ prefer persisted "usableAxes" (true live) when available
+    const persistedUsable = data[item].usableAxes
+    if (Array.isArray(persistedUsable) && persistedUsable.length) {
+      byProd[prod].axes = persistedUsable
+    } else {
+      byProd[prod].axes = collectAllAxisNamesFromPlain(parsed)
+    }
 
     const byRid = parsed && parsed.axesByReport ? parsed.axesByReport : {}
     const hats = new Set()
@@ -1177,8 +1218,8 @@ function setupUI(data, receiver) {
     byProd[prod].hats = Array.from(hats)
   }
 
-  const sortedPackage = Object.values(byProd).sort((a, b) => a.position - b.position)
-
+  let sortedPackage = Object.values(byProd).sort((a, b) => a.position - b.position)
+  delete sortedPackage.keybindArticulation
   const pkg = {
     receiver,
     appVersion: app.getVersion(),
@@ -1203,12 +1244,7 @@ let page = 'joyview'
 setTimeout(() => {
   main()
 }, 250)
-setTimeout(() => {
-  init = 0
-  const package = { receiver: "from_brain-detection-ready", data: 1 }
-  blastToUI(package)
-  logs('=== Ready to Receive Inputs ==='.green)
-}, 2000)
+
 
 //#############################
 
@@ -1332,7 +1368,6 @@ ipcMain.on('changePage', async (receivedData) => {
             logs_error("[APP]".bgMagenta, `Failed to delete Local JSON files: ${fullPath}`, err)
           }
         }
-        // if (app.isPackaged) restartApp()
       }
     }
     catch (error) {
@@ -1360,4 +1395,7 @@ ipcMain.on('renderer-response-unhandled-error', (event, message, location) => {
 })
 ipcMain.on('renderer-response-report-translationIssues', (event, message) => {
   logs_translate("[RENDERER-translationIssues]".bgRed, message)
+})
+ipcMain.on('renderer-response-showSetupLog', (event, message) => {
+  logs("[RENDERER-showSetupLog]".bgRed, message)
 })
