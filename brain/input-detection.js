@@ -2,7 +2,7 @@ const devMode = { devMode: 0 }
 const { setLogsMenuEnabled } = require('../menumaker')
 const { logs_translate, logs_warn, logs, logs_error, logs_debug } = require('../utils/logConfig')
 const { blastToUI } = require('../brain/input-functions')
-const { runWinHidDump, getWinHidDumpPath, formatJsonObject } = require('../utils/utilities')
+const { runWinHidDump, getWinHidDumpPath } = require('../utils/utilities')
 const HID = require('node-hid')
 const { app, ipcMain, BrowserWindow, webContents } = require('electron')
 const Store = require('electron-store').default
@@ -994,7 +994,6 @@ function setupUI(data, receiver) {
   blastToUI(package)
   logs('=== Ready to Receive Inputs ==='.green)
 }
-
 function startInputLoggerForDevice(d, parsed) {
   const prefix = jsPrefixForDevice(d)
   let device = null
