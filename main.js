@@ -26,12 +26,18 @@ function main() {
     const fs = require('fs')
     
     const colors = require('colors')
-    const { windowPosition, autoUpdater, runWinHidDump, getWinHidDumpPath } = require('./utils/utilities')
+    const { devicesObjBuilder, windowPosition, autoUpdater, runWinHidDump, getWinHidDumpPath } = require('./utils/utilities')
     const electronWindowIds = new Store({ name: "electronWindowIds" })
     const deviceInfo = new Store({ name: "deviceInfo" })
     const viewerLogs = new Store({ name: "viewerLogs" })
+    const layoutIndex = new Store({ name: "layoutIndex" })
+
     //! RESETS DEVICES TO DETECT NEW DEVICES
     // deviceInfo.set('devices', {})
+    if (!layoutIndex.get('devices')) {
+      layoutIndex.set('devices',{})
+    }
+    devicesObjBuilder()
     if (!viewerLogs.get('log')) {
       viewerLogs.set('log','[]')
     }

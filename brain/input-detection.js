@@ -2,17 +2,20 @@ const devMode = { devMode: 0 }
 const { setLogsMenuEnabled } = require('../menumaker')
 const { logs_translate, logs_warn, logs, logs_error, logs_debug } = require('../utils/logConfig')
 const { blastToUI } = require('../brain/input-functions')
-const { runWinHidDump, getWinHidDumpPath } = require('../utils/utilities')
+const { runWinHidDump, getWinHidDumpPath, formatJsonObject } = require('../utils/utilities')
 const HID = require('node-hid')
 const { app, ipcMain, BrowserWindow, webContents } = require('electron')
 const Store = require('electron-store').default
 const deviceInfo = new Store({ name: 'deviceInfo' })
 const windowItemsStore = new Store({ name: 'electronWindowIds' })
 const actionmaps = new Store({ name: 'actionmapsJSON' })
+const layoutIndex = new Store({ name: "layoutIndex" })
 const showConsoleMessages = windowItemsStore.get('showConsoleMessages')
 const staticData = require('../staticData.json')
 const fs = require('fs')
 const path = require('path')
+
+
 const { pathToFileURL } = require('url')
 const colors = require('colors')
 
@@ -65,7 +68,7 @@ function jsPrefixForDevice(d) {
   const idx = getOrAssignJsIndexForKey(key)
   return `js${idx}_`
 }
-// ✅ Persist "true live" axes detected during warmup so UI can show only real axes
+  // ✅ Persist "true live" axes detected during warmup so UI can show only real axes
 function setDeviceUsableAxes(d, axisNames) {
   const key = deviceKeyFromHidInfo(d)
   const devices = getDevicesStore()
@@ -78,7 +81,7 @@ function setDeviceUsableAxes(d, axisNames) {
 
   setDevicesStore(devices)
 }
-// ---------- dump parsing / descriptor extraction ----------
+  //---------- dump parsing / descriptor extraction ----------
 function parseAllHexBytesFromLine(line) {
   const m = String(line).match(/\b[0-9a-fA-F]{2}\b/g)
   if (!m) return []
@@ -521,6 +524,54 @@ function plainToInputsMaps(plain) {
     reportBitsByReport
   }
 }
+function addToIndexDevices(learned) {
+  const pidvid = pidVidFromHidPath(learned.path)
+  if (!pidvid) return
+  const storeAll = structuredClone(layoutIndex.store || {})
+  const hasNested = storeAll.layoutIndex && typeof storeAll.layoutIndex === 'object'
+  const data = hasNested ? storeAll.layoutIndex : storeAll
+  if (!data.devices || typeof data.devices !== 'object') data.devices = {}
+  if (!data.deviceList || typeof data.deviceList !== 'object') data.deviceList = {}
+  if (!data.schema) data.schema = 1
+  const productRaw = String(learned.product || '')
+  const productNorm = productRaw.trim().toLowerCase()
+  let layoutFile = data.deviceList[learned.product] || null
+  if (!layoutFile) {
+    const matchKey = Object.keys(data.deviceList).find(k => String(k).trim().toLowerCase() === productNorm) || null
+    if (matchKey) layoutFile = data.deviceList[matchKey]
+  }
+
+  if (!layoutFile) {
+    logs_warn(
+      '[BRAIN]'.bgCyan,
+      'input-detection'.yellow,
+      'No deviceList match for product',
+      learned.product,
+      'pidvid',
+      pidvid
+    )
+    return
+  }
+
+  data.devices[pidvid] = layoutFile
+
+  if (hasNested) {
+    layoutIndex.set('layoutIndex', data)
+  } else {
+    layoutIndex.set('devices', data.devices)
+    layoutIndex.set('schema', data.schema)
+    layoutIndex.set('deviceList', data.deviceList)
+  }
+
+  // logs_debug(
+  //   '[BRAIN]'.bgCyan,
+  //   'input-detection'.yellow,
+  //   'Mapped pidvid -> layout',
+  //   pidvid,
+  //   '->',
+  //   layoutFile
+  // )
+}
 function learnAndPersistDevice(d, dumpText) {
   // IMPORTANT CHANGE: pass the full device so we can match by PATH
   const extracted = extractDescriptorBufferFromDump(dumpText, d)
@@ -538,7 +589,6 @@ function learnAndPersistDevice(d, dumpText) {
   const key = deviceKeyFromHidInfo(d)
   const devices = getDevicesStore()
   const jsIndex = getOrAssignJsIndexForKey(key)
-
   devices[key] = {
     key: key,
     jsIndex: jsIndex,
@@ -555,7 +605,7 @@ function learnAndPersistDevice(d, dumpText) {
     parsedInputs: inputsMapsToPlain(parsed),
     savedAt: Math.floor(Date.now() / 1000)
   }
-
+  addToIndexDevices(devices[key])
   if (showConsoleMessages) { console.log('Learned Device:'.cyan, devices[key].product) }
   logs('[BRAIN]'.bgCyan, 'input-detection'.yellow, 'Learned Device:'.cyan, devices[key].product)
   blastToUI(package = {
@@ -563,6 +613,7 @@ function learnAndPersistDevice(d, dumpText) {
     ...{ receiver: "from_brain-detection" },
   })
   setDevicesStore(devices)
+
   return parsed
 }
 function sleep(ms) {
@@ -745,7 +796,6 @@ async function main() {
   const dumpAvailable = (dumpStatus && dumpStatus.ok === 1 && dumpText)
 
   const stored = getDevicesStore()
-
   for (const d of devices) {
     const key = deviceKeyFromHidInfo(d)
     getOrAssignJsIndexForKey(key)
@@ -814,6 +864,8 @@ async function main() {
 
   if (page == 'setup') { setupUI(getDevicesStore(), "from_brain-detection") }
 }
+
+
 function initializeUI(data, receiver) {
   if (windowItemsStore.get('currentPage') === 'joyview') {
     let package = {}
@@ -1177,7 +1229,7 @@ function startInputLoggerForDevice(d, parsed) {
       }
     }
 
-    logs(d.product, usableNow)
+    // logs(d.product, usableNow)
 
     if (usableNow.length) {
       setDeviceUsableAxes(d, usableNow)
@@ -1382,17 +1434,17 @@ function startInputLoggerForDevice(d, parsed) {
     }, 8000)
   })
 
-  logs(`[${prefix}] listeners attached`, {
-    data: device.listenerCount('data'),
-    error: device.listenerCount('error'),
-    path: d.path,
-    product: d.product
-  })
+  // logs(`[${prefix}] listeners attached`, {
+  //   data: device.listenerCount('data'),
+  //   error: device.listenerCount('error'),
+  //   path: d.path,
+  //   product: d.product
+  // })
 
-  blastToUI({
-    receiver: 'from_brain-detection',
-    message: `Input-Detection: ${prefix} listeners attached (data=${device.listenerCount('data')} error=${device.listenerCount('error')})`
-  })
+  // blastToUI({
+  //   receiver: 'from_brain-detection',
+  //   message: `Input-Detection: ${prefix} listeners attached (data=${device.listenerCount('data')} error=${device.listenerCount('error')})`
+  // })
 }
 
 
@@ -1412,35 +1464,25 @@ ipcMain.handle('joyview:get-layout', async (event, { vidPidKey }) => {
       return { ok: 0, error: 'Invalid vidPidKey' }
     }
 
-    const dir = resolveLayoutsDir(app, path)
-
-    const indexPath = path.join(dir, 'index.json')
-    if (!fs.existsSync(indexPath)) {
-      return { ok: 0, error: `Missing layouts/index.json at ${indexPath}` }
-    }
-
-    const indexJson = JSON.parse(fs.readFileSync(indexPath, 'utf8'))
-    const devicesMap = indexJson?.devices
+    let devicesMap = layoutIndex.get(layoutIndex)
+    devicesMap = structuredClone(layoutIndex.store)
 
     if (!devicesMap || typeof devicesMap !== 'object') {
-      return { ok: 0, error: 'layouts/index.json missing "devices" map' }
+      return { ok: 0, error: 'layoutIndex.json missing "devices" map' }
     }
+    const layoutFile = devicesMap.devices[vidPidKey]
 
-    const layoutFile = devicesMap[vidPidKey]
     if (!layoutFile) {
       return { ok: 0, error: `No layout mapping for ${vidPidKey}` }
     }
-
+    const dir = resolveLayoutsDir(app, path)
     const layoutPath = path.join(dir, layoutFile)
     if (!fs.existsSync(layoutPath)) {
       return { ok: 0, error: `Layout file not found: ${layoutPath}` }
     }
 
     const layoutJson = JSON.parse(fs.readFileSync(layoutPath, 'utf8'))
-
-    // ===== FIX: schema2 overlays.{view}.image, fallback schema1 overlay.image =====
     let imageName = null
-
     if (layoutJson && layoutJson.overlays && typeof layoutJson.overlays === 'object') {
       const keys = Object.keys(layoutJson.overlays)
       if (keys.length) {
@@ -1449,7 +1491,7 @@ ipcMain.handle('joyview:get-layout', async (event, { vidPidKey }) => {
         if (ov && ov.image) imageName = ov.image
       }
     }
-
+    
     if (!imageName && layoutJson && layoutJson.overlay && layoutJson.overlay.image) {
       imageName = layoutJson.overlay.image
     }
@@ -1457,15 +1499,12 @@ ipcMain.handle('joyview:get-layout', async (event, { vidPidKey }) => {
     if (!imageName) {
       return { ok: 0, error: `Layout ${layoutFile} missing overlays[view].image (or overlay.image)` }
     }
-    // ===========================================================================
 
     const imagePath = path.join(dir, imageName)
     if (!fs.existsSync(imagePath)) {
       return { ok: 0, error: `Overlay image not found: ${imagePath}` }
     }
-
     const imageUrl = pathToFileURL(imagePath).toString()
-
     return { ok: 1, layoutFile, layoutJson, imageUrl }
   } catch (err) {
     return { ok: 0, error: err?.message || String(err) }

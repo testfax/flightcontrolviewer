@@ -12,6 +12,24 @@ const xml2js = require('xml2js')
 const { execFileSync } = require('child_process')
 
 const util = { 
+    devicesObjBuilder: function() {
+        function resolveLayoutsDir(app, path) {
+            return path.join(app.getAppPath(), 'layouts')
+        }
+        try {
+            const layoutIndex = new Store({ name: "layoutIndex" })
+            const dir = resolveLayoutsDir(app, path)
+            const indexPath = path.join(dir, 'index.json')
+            if (!fs.existsSync(indexPath)) {
+                logs_error("no layout/index.json file")
+            }
+            const indexJson = JSON.parse(fs.readFileSync(indexPath, 'utf8'))
+            layoutIndex.set(indexJson)
+        }
+        catch (err) {
+            logs_error('[APP]'.bgRed, 'devicesObjBuilder - Failed to write layoutIndex', err.stack)
+        }
+    },
     formatJsonObject: function(obj, indent) {
         indent = indent || 0
         var spaces = ''
@@ -201,7 +219,8 @@ const util = {
         if (!result.hasOwnProperty('clientSize')) { 
             // return {moveTo:[700,100], resizeTo:[600,600]}
             saveWindowPosition()
-            return {moveTo:[639,18], resizeTo:[800,1000]}
+            return {moveTo:[-876,13], resizeTo:[800,1000]}
+            // return {moveTo:[639,18], resizeTo:[800,1000]}
         }
         if (init) {
             //If init is truthy, then return the result of the file contents and send back what you need.

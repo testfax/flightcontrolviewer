@@ -17,7 +17,8 @@ const links = {
       'actionmapsJSON.json',
       'deviceInfo.json',
       'electronWindowIds.json',
-      'viewerLogs.json'
+      'viewerLogs.json',
+      'layoutIndex.json'
     ]
     deleteAppJsonFiles(filesToDelete)
     function deleteAppJsonFiles(filesToDelete) {

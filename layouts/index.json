@@ -1,22 +1,14 @@
 {
   "schema": 1,
   "deviceList": {
-    "VKBsim Gladiator EVO  R": "vkbsim-gladiator-evo-r.json",
-    "VKBsim Gladiator EVO  L": "vkbsim-gladiator-evo-l.json",
+    "VKBsim Gladiator EVO R": "vkbsim-gladiator-evo-r.json",
+    "VKBsim Gladiator EVO L": "vkbsim-gladiator-evo-l.json",
     "VKBsim Gladiator EVO OT L": "vkbsim-gladiator-evo-ot-l.json",
     "VKBsim Gladiator EVO OT R": "vkbsim-gladiator-evo-ot-r.json",
     "VKBSim T-Rudder": "vkbsim-t-rudder.json",
     "VPC ACE-Torq Rudder": "vpc-ace-torq-rudder.json",
-    "VPC Constellation Alpha Prime (Left)": "left-virpil-constellation-alpha-prime.json",
-    "VPC Constellation Alpha Prime (Right)": "right-virpil-constellation-alpha-prime.json",
-    "VPC Constellation Alpha (Left)": "left-virpil-constellation-alpha.json",
-    "VPC Constellation Alpha (Right)": "right-virpil-constellation-alpha.json",
-    "vJoy Virtual Joystick": "vjoy.json"
-  },
-  "devices": {
-    "3344:43F4": "right-virpil-constellation-alpha-prime.json",
-    "3344:03F3": "left-virpil-constellation-alpha-prime.json",
-    "3344:01F9": "vpc-ace-torq-rudder.json",
-    "1234:BEAD": "vjoy.json"
+    "L-VPC Stick WarBRD-D": "left-virpil-constellation-alpha-prime.json",
+    "R-VPC Stick WarBRD-D": "right-virpil-constellation-alpha-prime.json",
+    "vJoy - Virtual Joystick": "vjoy.json"
   }
 }
