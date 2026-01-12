@@ -994,6 +994,7 @@ function setupUI(data, receiver) {
   blastToUI(package)
   logs('=== Ready to Receive Inputs ==='.green)
 }
+
 function startInputLoggerForDevice(d, parsed) {
   const prefix = jsPrefixForDevice(d)
   let device = null
@@ -1438,22 +1439,19 @@ function startInputLoggerForDevice(d, parsed) {
     }, 8000)
   })
 
-  // logs(`[${prefix}] listeners attached`, {
-  //   data: device.listenerCount('data'),
-  //   error: device.listenerCount('error'),
-  //   path: d.path,
-  //   product: d.product
-  // })
+  logs(`[${prefix}] listeners attached`, {
+    data: device.listenerCount('data'),
+    error: device.listenerCount('error'),
+    path: d.path,
+    product: d.product
+  })
 
-  // blastToUI({
-  //   receiver: 'from_brain-detection',
-  //   message: `Input-Detection: ${prefix} listeners attached (data=${device.listenerCount('data')} error=${device.listenerCount('error')})`
-  // })
+  blastToUI({
+    receiver: 'from_brain-detection',
+    message: `Input-Detection: ${prefix} listeners attached (data=${device.listenerCount('data')} error=${device.listenerCount('error')})`
+  })
 }
 
-
-
-//VERY FIRST TIME RUN ONLY!!!!
 let init = 1
 let page = 'joyview'
 setTimeout(() => {
