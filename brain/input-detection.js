@@ -1062,7 +1062,6 @@ function startInputLoggerForDevice(d, parsed) {
     lastReported = keyStr
     return true
   }
-
   // ✅ pick RID by expected payload length (fixes VKB "firstByte looks random" cases)
   function expectedPayloadLenForRid(rid) {
     if (!parsed.reportBitsByReport || !parsed.reportBitsByReport.has(rid)) return null
@@ -1071,7 +1070,6 @@ function startInputLoggerForDevice(d, parsed) {
     if (!Number.isFinite(bytes) || bytes <= 0) return null
     return bytes
   }
-
   function resolveRidAndPayload(dataBuf) {
     let rid = 0
     let payload = dataBuf
@@ -1173,7 +1171,6 @@ function startInputLoggerForDevice(d, parsed) {
 
     return { rid, payload }
   }
-
   // ✅ WARMUP FIX (the important part):
   // 1) Prefer axes that actually MOVED during warmup (span > WARMUP_EPS)
   // 2) If nothing moved (user didn't touch anything), do NOT return [] and do NOT return x,y,z junk
@@ -1444,7 +1441,6 @@ function startInputLoggerForDevice(d, parsed) {
     path: d.path,
     product: d.product
   })
-
   blastToUI({
     receiver: 'from_brain-detection',
     message: `Input-Detection: ${prefix} listeners attached (data=${device.listenerCount('data')} error=${device.listenerCount('error')})`
