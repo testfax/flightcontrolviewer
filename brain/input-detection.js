@@ -1039,93 +1039,35 @@ function startInputLoggerForDevice(d, parsed) {
   const MOVE_PERCENT = 0.02
   const AXIS_COOLDOWN_MS = 1000
 
-  // --- DEBUG: axes-by-rid dump + rid sampling + packet sampling + axis defs + axis value sampling ---
-  const DEBUG_RID = 1
+  // --- DEBUG: show that packets are flowing + show decoded axes every second (uses logs) ---
+  const HEARTBEAT_MS = 1000
+  let hbLastAt = 0
+  let hbPackets = 0
 
+  // dump axes-by-rid ONCE (uses logs)
   let axesByRidDumped = false
   function dumpAxesByRidOnce() {
-    if (!DEBUG_RID) return
     if (axesByRidDumped) return
     axesByRidDumped = true
 
     try {
       const rows = []
       for (const [rid, list] of parsed.axesByReport.entries()) {
-        const names = (list || [])
-          .filter(a => a && a.name)
-          .map(a => a.name)
-          .join(', ')
-        rows.push({ rid, axes: names })
+        const names = (list || []).filter(a => a && a.name).map(a => a.name)
+        rows.push({ rid, names })
       }
       rows.sort((a, b) => a.rid - b.rid)
 
-      logs('[AXES BY RID]'.bgCyan, prefix, d.product)
-      for (const r of rows) {
-        logs(' rid'.yellow, String(r.rid).cyan, '=>'.yellow, r.axes || '(none)')
-      }
+      logs('[AXES BY RID]'.cyan, prefix, d.product, rows.map(r => ({
+        rid: r.rid,
+        axes: r.names
+      })))
     } catch (err) {
-      logs_error('[AXES BY RID] dump failed'.bgRed, err)
+      logs_error('[AXES BY RID] dump failed', err)
     }
   }
 
-  let ridSampleUntil = 0
-  let ridLastPrintedAt = 0
-  const RID_SAMPLE_MS = 150
-
-  global.dumpRudderRid = (ms = 2000) => {
-    ridSampleUntil = Date.now() + Math.max(250, Number(ms) || 2000)
-    logs('[RID]'.bgBlue, prefix, 'sampling enabled for'.yellow, (ridSampleUntil - Date.now()) + 'ms')
-  }
-
-  let pktSampleUntil = 0
-  let pktLastPrintedAt = 0
-  const PKT_SAMPLE_MS = 250
-
-  global.dumpRudderPackets = (ms = 2000) => {
-    pktSampleUntil = Date.now() + Math.max(250, Number(ms) || 2000)
-    logs('[PKT]'.bgMagenta, prefix, 'sampling enabled for'.yellow, (pktSampleUntil - Date.now()) + 'ms')
-  }
-
-  global.dumpAxisDefs = () => {
-    logs('[AXIS DEFS]'.bgCyan, prefix, d.product)
-
-    try {
-      const rows = []
-      for (const [rid, list] of parsed.axesByReport.entries()) {
-        rows.push({ rid, list: list || [] })
-      }
-      rows.sort((a, b) => a.rid - b.rid)
-
-      for (const row of rows) {
-        logs(' rid'.yellow, row.rid, '=>'.yellow)
-        for (const a of row.list) {
-          if (!a) continue
-          logs('  -'.yellow, {
-            name: a.name,
-            usagePage: a.usagePage,
-            usage: a.usage,
-            bitOffset: a.bitOffset,
-            bitSize: a.bitSize,
-            logicalMin: a.logicalMin,
-            logicalMax: a.logicalMax
-          })
-        }
-      }
-    } catch (err) {
-      logs_error('[AXIS DEFS] dump failed'.bgRed, err)
-    }
-  }
-
-  let axisSampleUntil = 0
-  let axisSampleLastAt = 0
-  const AXIS_SAMPLE_MS = 200
-
-  global.sampleAxes = (ms = 2000) => {
-    axisSampleUntil = Date.now() + Math.max(250, Number(ms) || 2000)
-    axisSampleLastAt = 0
-    logs('[AXIS SAMPLE]'.bgMagenta, prefix, 'enabled for'.yellow, (axisSampleUntil - Date.now()) + 'ms')
-  }
-  // ------------------------------------------------------------------------
+  // ------------------------------------------------------------------
 
   // SINGLE-AXIS EXCEPTION (do not change behavior; just keep your existing logic)
   const axisNames = new Set()
@@ -1327,65 +1269,46 @@ function startInputLoggerForDevice(d, parsed) {
     const rid = resolved.rid
     const payload = resolved.payload
 
-    // DEBUG: dump axes-per-rid once (first time we get data)
+    // DEBUG: dump once so you know what this device *should* have
     dumpAxesByRidOnce()
 
-    // DEBUG: RID sampling (only when enabled)
-    if (DEBUG_RID && ridSampleUntil && Date.now() < ridSampleUntil) {
-      const now = Date.now()
-      if (now - ridLastPrintedAt >= RID_SAMPLE_MS) {
-        ridLastPrintedAt = now
-        logs(
-          '[RID]'.bgBlue,
-          prefix,
-          'rid='.yellow, rid,
-          'payloadLen='.yellow, payload.length,
-          'rawLen='.yellow, data.length
-        )
-      }
-    }
+    // DEBUG: heartbeat proving packets are flowing + showing decoded axes snapshot
+    hbPackets++
+    const now = Date.now()
+    if (now - hbLastAt >= HEARTBEAT_MS) {
+      hbLastAt = now
 
-    // DEBUG: Packet sampling (optional)
-    if (DEBUG_RID && pktSampleUntil && Date.now() < pktSampleUntil) {
-      const now = Date.now()
-      if (now - pktLastPrintedAt >= PKT_SAMPLE_MS) {
-        pktLastPrintedAt = now
-        logs(
-          '[PKT]'.bgMagenta,
-          prefix,
-          'rid='.yellow, rid,
-          'first16='.yellow,
-          Array.from(payload.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' ')
-        )
+      const axesForRid = parsed.axesByReport.get(rid) || []
+      const snap = {}
+
+      for (const a of axesForRid) {
+        if (!a || !a.name) continue
+        try {
+          const rawU = readBitsAsUnsignedLE(payload, a.bitOffset, a.bitSize)
+          let v = rawU
+          if (a.logicalMin < 0) v = toSigned(rawU, a.bitSize)
+          snap[a.name] = v
+        } catch (err) {
+          snap[a.name] = 'ERR'
+        }
       }
+
+      logs('[INPUT HEARTBEAT]'.cyan, {
+        prefix,
+        product: d.product,
+        rid,
+        packetsLastSec: hbPackets,
+        axes: snap
+      })
+
+      hbPackets = 0
     }
 
     const buttons = parsed.buttonsByReport.get(rid) || []
     const axes = parsed.axesByReport.get(rid) || []
     if (!buttons.length && !axes.length) return
 
-    // DEBUG: sample decoded axis values while enabled (prints x/y/z etc)
-    if (axisSampleUntil && Date.now() < axisSampleUntil) {
-      const now = Date.now()
-      if (now - axisSampleLastAt >= AXIS_SAMPLE_MS) {
-        axisSampleLastAt = now
-
-        const snap = {}
-        for (const a of axes) {
-          if (!a || !a.name) continue
-
-          const rawU = readBitsAsUnsignedLE(payload, a.bitOffset, a.bitSize)
-          let v = rawU
-          if (a.logicalMin < 0) v = toSigned(rawU, a.bitSize)
-
-          snap[a.name] = v
-        }
-
-        logs('[AXIS SAMPLE]'.bgMagenta, prefix, 'rid'.yellow, rid, snap)
-      }
-    }
-
-    // Lazily init baseline states
+    // Lazily init baseline states (NO "warmup return" gating)
     for (const b of buttons) {
       const k = `${rid}:${b.usage}`
       if (!lastButtons.has(k)) {
@@ -1393,7 +1316,7 @@ function startInputLoggerForDevice(d, parsed) {
       }
     }
 
-    // Warmup sampling + lazy init
+    // Warmup sampling (UI only) + lazy init
     for (const a of axes) {
       const outKey = `${prefix}axis_${a.name}`
 
@@ -1405,12 +1328,14 @@ function startInputLoggerForDevice(d, parsed) {
       if (!axisActive.has(outKey)) axisActive.set(outKey, false)
       if (!axisLastEmit.has(outKey)) axisLastEmit.set(outKey, 0)
 
+      // init hat virtual directions
       if (isHatAxis(a.usagePage, a.usage, a.name)) {
         const hatBase = `${prefix}${a.name}`
         if (!hatLastDirs.has(hatBase)) hatLastDirs.set(hatBase, hatValueToDirs(val))
         continue
       }
 
+      // learn rotx/roty home (first seen value)
       if (a.name === 'rotx' || a.name === 'roty') {
         if (!rotHome.has(outKey)) rotHome.set(outKey, val)
         if (!rotArmed.has(outKey)) rotArmed.set(outKey, true)
@@ -1425,6 +1350,7 @@ function startInputLoggerForDevice(d, parsed) {
       axisSeen.set(outKey, (axisSeen.get(outKey) || 0) + 1)
     }
 
+    // ✅ warmup persistence happens once, never blocks input
     persistUsableAxesOnce()
 
     // Buttons
@@ -1438,7 +1364,7 @@ function startInputLoggerForDevice(d, parsed) {
 
         const out = `${prefix}button${b.usage}`
         if (reportOnce(out)) {
-          if (showConsoleMessages) console.log(out.blue)
+          if (showConsoleMessages) logs(out)
           gatherAfterDeviceInputs(out, d)
         }
       }
@@ -1446,7 +1372,7 @@ function startInputLoggerForDevice(d, parsed) {
       lastButtons.set(key, down)
     }
 
-    // Axes + hats
+    // Axes (including hats, but hats are handled as POV -> virtual buttons)
     for (const a of axes) {
       const out = `${prefix}axis_${a.name}`
 
@@ -1454,6 +1380,7 @@ function startInputLoggerForDevice(d, parsed) {
       let val = rawU
       if (a.logicalMin < 0) val = toSigned(rawU, a.bitSize)
 
+      // Hat -> virtual buttons
       if (isHatAxis(a.usagePage, a.usage, a.name)) {
         axisLastVal.set(out, val)
         axisActive.set(out, false)
@@ -1477,7 +1404,7 @@ function startInputLoggerForDevice(d, parsed) {
           if (is && !was) {
             lastButtonAt = Date.now()
             if (reportOnce(outKey)) {
-              if (showConsoleMessages) console.log(outKey.blue)
+              if (showConsoleMessages) logs(outKey)
               gatherAfterDeviceInputs(outKey, d)
             }
           }
@@ -1493,7 +1420,7 @@ function startInputLoggerForDevice(d, parsed) {
       const prevVal = axisLastVal.get(out)
       axisLastVal.set(out, val)
 
-      const now = Date.now()
+      const now2 = Date.now()
       const lastEmit = axisLastEmit.get(out) || 0
 
       const wasActive = axisActive.get(out) || false
@@ -1505,8 +1432,9 @@ function startInputLoggerForDevice(d, parsed) {
         if (Math.abs(val - prevVal) >= moveThreshold) movedEnough = true
       }
 
-      const buttonCooldownActive = (now - lastButtonAt) < AXIS_BLOCK_AFTER_BUTTON_MS
+      const buttonCooldownActive = (now2 - lastButtonAt) < AXIS_BLOCK_AFTER_BUTTON_MS
 
+      // rotx/roty gating
       const isRot = (a.name === 'rotx' || a.name === 'roty')
       if (isRot) {
         const home = rotHome.get(out)
@@ -1535,12 +1463,12 @@ function startInputLoggerForDevice(d, parsed) {
       if (init == 0 && !buttonCooldownActive) {
         if (!wasActive && isActive) {
           if (reportOnce(out)) {
-            if (showConsoleMessages) console.log(out.cyan)
+            if (showConsoleMessages) logs(out)
           }
-          axisLastEmit.set(out, now)
-        } else if (movedEnough && (now - lastEmit) >= AXIS_COOLDOWN_MS) {
+          axisLastEmit.set(out, now2)
+        } else if (movedEnough && (now2 - lastEmit) >= AXIS_COOLDOWN_MS) {
           if (reportOnce(out)) {
-            if (showConsoleMessages) console.log(out.red)
+            if (showConsoleMessages) logs(out)
             gatherAfterDeviceInputs(out, d)
           }
 
@@ -1548,7 +1476,7 @@ function startInputLoggerForDevice(d, parsed) {
             rotArmed.set(out, false)
           }
 
-          axisLastEmit.set(out, now)
+          axisLastEmit.set(out, now2)
         }
       }
 
@@ -1558,9 +1486,8 @@ function startInputLoggerForDevice(d, parsed) {
 
   device.on('error', (err) => {
     logs_error(err)
-    console.log(err)
     setTimeout(() => {
-      console.log('[BRAIN]'.bgCyan, 'RESTARTING AFTER DEVICE LOST'.red)
+      logs('[BRAIN]'.bgCyan, 'RESTARTING AFTER DEVICE LOST'.red)
       app.relaunch()
       app.exit(0)
     }, 8000)
@@ -1577,6 +1504,7 @@ function startInputLoggerForDevice(d, parsed) {
     message: `Input-Detection: ${prefix} listeners attached (data=${device.listenerCount('data')} error=${device.listenerCount('error')})`
   })
 }
+
 
 
 let init = 1
