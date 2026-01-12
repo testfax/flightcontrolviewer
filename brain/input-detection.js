@@ -1039,19 +1039,55 @@ function startInputLoggerForDevice(d, parsed) {
   const MOVE_PERCENT = 0.02
   const AXIS_COOLDOWN_MS = 1000
 
-  // --- DEBUG: sample suppressed axes (does not affect behavior) ---
-  const SUPPRESS_DEBUG = 1
-  const SUPPRESS_SAMPLE_MS = 1000
-  let lastSuppressSample = 0
-  function sampleSuppressed(out, info) {
-    if (!SUPPRESS_DEBUG) return
-    const now = Date.now()
-    if (now - lastSuppressSample < SUPPRESS_SAMPLE_MS) return
-    lastSuppressSample = now
+  // --- DEBUG: axes-by-rid dump + rid sampling (does not affect behavior) ---
+  const DEBUG_RID = 1
+  let axesByRidDumped = false
 
-    logs('[SUPPRESSED AXIS]'.bgMagenta, out.cyan, info)
+  function dumpAxesByRidOnce() {
+    if (!DEBUG_RID) return
+    if (axesByRidDumped) return
+    axesByRidDumped = true
+
+    try {
+      const rows = []
+      for (const pair of parsed.axesByReport.entries()) {
+        const rid = pair[0]
+        const list = pair[1] || []
+        const names = list
+          .filter(a => a && a.name)
+          .map(a => a.name)
+          .join(', ')
+        rows.push({ rid, axes: names })
+      }
+      rows.sort((a, b) => a.rid - b.rid)
+
+      console.log('[AXES BY RID]'.bgCyan, prefix, d.product)
+      for (const r of rows) {
+        console.log('  rid'.yellow, String(r.rid).cyan, '=>'.yellow, r.axes || '(none)')
+      }
+    } catch (err) {
+      console.log('[AXES BY RID] dump failed'.bgRed, err)
+    }
   }
-  // --------------------------------------------------------------
+
+  let ridSampleUntil = 0
+  let ridLastPrintedAt = 0
+  const RID_SAMPLE_MS = 150
+
+  global.dumpRudderRid = (ms = 2000) => {
+    ridSampleUntil = Date.now() + Math.max(250, Number(ms) || 2000)
+    console.log('[RID]'.bgBlue, prefix, 'sampling enabled for'.yellow, (ridSampleUntil - Date.now()) + 'ms')
+  }
+
+  let pktSampleUntil = 0
+  let pktLastPrintedAt = 0
+  const PKT_SAMPLE_MS = 250
+
+  global.dumpRudderPackets = (ms = 2000) => {
+    pktSampleUntil = Date.now() + Math.max(250, Number(ms) || 2000)
+    console.log('[PKT]'.bgMagenta, prefix, 'sampling enabled for'.yellow, (pktSampleUntil - Date.now()) + 'ms')
+  }
+  // ------------------------------------------------------------------------
 
   // SINGLE-AXIS EXCEPTION (do not change behavior; just keep your existing logic)
   const axisNames = new Set()
@@ -1188,10 +1224,7 @@ function startInputLoggerForDevice(d, parsed) {
     return { rid, payload }
   }
 
-  // ✅ WARMUP FIX (the important part):
-  // 1) Prefer axes that actually MOVED during warmup (span > WARMUP_EPS)
-  // 2) If nothing moved (user didn't touch anything), do NOT return [] and do NOT return x,y,z junk
-  //    Instead pick ONE best axis as a safe fallback
+  // ✅ WARMUP FIX
   function persistUsableAxesOnce() {
     if (usableAxesPersisted) return
     if (warmupStartedAt === 0) return
@@ -1222,19 +1255,16 @@ function startInputLoggerForDevice(d, parsed) {
 
     const uniq = Array.from(candidatesByName.values())
 
-    // Prefer moved axes
     let usableNow = uniq
       .filter(c => c.span > WARMUP_EPS)
       .sort((a, b) => b.span - a.span)
       .map(c => c.name)
 
-    // Fallback: pick ONE best axis if nothing moved
     if (!usableNow.length && uniq.length) {
       uniq.sort((a, b) => (b.span - a.span) || (b.range - a.range))
       usableNow = [uniq[0].name]
     }
 
-    // Last-resort fallback: if we somehow still have none (eg no samples), pick first descriptor axis (non-hat)
     if (!usableNow.length) {
       for (const list of parsed.axesByReport.values()) {
         for (const ax of list) {
@@ -1249,7 +1279,6 @@ function startInputLoggerForDevice(d, parsed) {
 
     if (usableNow.length) {
       setDeviceUsableAxes(d, usableNow)
-      // do NOT call initializeUI here (per your note)
     }
 
     usableAxesPersisted = true
@@ -1260,11 +1289,44 @@ function startInputLoggerForDevice(d, parsed) {
     const rid = resolved.rid
     const payload = resolved.payload
 
+    // DEBUG: dump axes-per-rid once (first time we get data)
+    dumpAxesByRidOnce()
+
+    // DEBUG: RID sampling (only when enabled)
+    if (DEBUG_RID && ridSampleUntil && Date.now() < ridSampleUntil) {
+      const now = Date.now()
+      if (now - ridLastPrintedAt >= RID_SAMPLE_MS) {
+        ridLastPrintedAt = now
+        console.log(
+          '[RID]'.bgBlue,
+          prefix,
+          'rid='.yellow, rid,
+          'payloadLen='.yellow, payload.length,
+          'rawLen='.yellow, data.length
+        )
+      }
+    }
+
+    // DEBUG: Packet sampling (optional)
+    if (DEBUG_RID && pktSampleUntil && Date.now() < pktSampleUntil) {
+      const now = Date.now()
+      if (now - pktLastPrintedAt >= PKT_SAMPLE_MS) {
+        pktLastPrintedAt = now
+        console.log(
+          '[PKT]'.bgMagenta,
+          prefix,
+          'rid='.yellow, rid,
+          'first16='.yellow,
+          Array.from(payload.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' ')
+        )
+      }
+    }
+
     const buttons = parsed.buttonsByReport.get(rid) || []
     const axes = parsed.axesByReport.get(rid) || []
     if (!buttons.length && !axes.length) return
 
-    // Lazily init baseline states (NO "warmup return" gating)
+    // Lazily init baseline states
     for (const b of buttons) {
       const k = `${rid}:${b.usage}`
       if (!lastButtons.has(k)) {
@@ -1272,7 +1334,7 @@ function startInputLoggerForDevice(d, parsed) {
       }
     }
 
-    // Warmup sampling (UI only) + lazy init
+    // Warmup sampling + lazy init
     for (const a of axes) {
       const outKey = `${prefix}axis_${a.name}`
 
@@ -1284,14 +1346,12 @@ function startInputLoggerForDevice(d, parsed) {
       if (!axisActive.has(outKey)) axisActive.set(outKey, false)
       if (!axisLastEmit.has(outKey)) axisLastEmit.set(outKey, 0)
 
-      // init hat virtual directions
       if (isHatAxis(a.usagePage, a.usage, a.name)) {
         const hatBase = `${prefix}${a.name}`
         if (!hatLastDirs.has(hatBase)) hatLastDirs.set(hatBase, hatValueToDirs(val))
         continue
       }
 
-      // learn rotx/roty home (first seen value)
       if (a.name === 'rotx' || a.name === 'roty') {
         if (!rotHome.has(outKey)) rotHome.set(outKey, val)
         if (!rotArmed.has(outKey)) rotArmed.set(outKey, true)
@@ -1306,7 +1366,6 @@ function startInputLoggerForDevice(d, parsed) {
       axisSeen.set(outKey, (axisSeen.get(outKey) || 0) + 1)
     }
 
-    // ✅ warmup persistence happens once, never blocks input
     persistUsableAxesOnce()
 
     // Buttons
@@ -1328,7 +1387,7 @@ function startInputLoggerForDevice(d, parsed) {
       lastButtons.set(key, down)
     }
 
-    // Axes (including hats, but hats are handled as POV -> virtual buttons)
+    // Axes + hats
     for (const a of axes) {
       const out = `${prefix}axis_${a.name}`
 
@@ -1336,7 +1395,6 @@ function startInputLoggerForDevice(d, parsed) {
       let val = rawU
       if (a.logicalMin < 0) val = toSigned(rawU, a.bitSize)
 
-      // Hat -> virtual buttons
       if (isHatAxis(a.usagePage, a.usage, a.name)) {
         axisLastVal.set(out, val)
         axisActive.set(out, false)
@@ -1390,7 +1448,6 @@ function startInputLoggerForDevice(d, parsed) {
 
       const buttonCooldownActive = (now - lastButtonAt) < AXIS_BLOCK_AFTER_BUTTON_MS
 
-      // rotx/roty gating
       const isRot = (a.name === 'rotx' || a.name === 'roty')
       if (isRot) {
         const home = rotHome.get(out)
@@ -1406,60 +1463,15 @@ function startInputLoggerForDevice(d, parsed) {
           if (!armed) {
             if (rotDelta <= withinTen) rotArmed.set(out, true)
             axisActive.set(out, isActive)
-
-            if (isActive || movedEnough) {
-              sampleSuppressed(out, {
-                val,
-                prevVal,
-                center: cfg.center,
-                threshold: cfg.threshold,
-                reasons: ['rotNotArmed']
-              })
-            }
             continue
           }
 
           if (rotDelta < halfThrow) {
             axisActive.set(out, isActive)
-
-            if (isActive || movedEnough) {
-              sampleSuppressed(out, {
-                val,
-                prevVal,
-                center: cfg.center,
-                threshold: cfg.threshold,
-                reasons: ['rotUnderHalfThrow']
-              })
-            }
             continue
           }
         }
       }
-
-      // --- DEBUG: explain suppressed axis reporting (does not affect behavior) ---
-      if (isActive || movedEnough) {
-        const suppressReasons = []
-
-        if (init != 0) suppressReasons.push('init!=0')
-        if (buttonCooldownActive) suppressReasons.push('buttonCooldown')
-
-        if (!wasActive && !isActive) suppressReasons.push('belowCenterThreshold')
-
-        if (wasActive && isActive && !movedEnough) {
-          suppressReasons.push('deltaBelowMoveThreshold')
-        }
-
-        if (suppressReasons.length) {
-          sampleSuppressed(out, {
-            val,
-            prevVal,
-            center: cfg.center,
-            threshold: cfg.threshold,
-            reasons: suppressReasons
-          })
-        }
-      }
-      // ------------------------------------------------------------
 
       if (init == 0 && !buttonCooldownActive) {
         if (!wasActive && isActive) {
@@ -1506,6 +1518,7 @@ function startInputLoggerForDevice(d, parsed) {
     message: `Input-Detection: ${prefix} listeners attached (data=${device.listenerCount('data')} error=${device.listenerCount('error')})`
   })
 }
+
 
 
 let init = 1

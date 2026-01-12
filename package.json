@@ -1,6 +1,6 @@
 {
   "name": "flightcontrolviewer",
-  "version": "1.0.25",
+  "version": "1.0.26",
   "description": "Star Citizen Flight Control Viewer",
   "main": "main.js",
   "scripts": {
