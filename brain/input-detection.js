@@ -1039,10 +1039,10 @@ function startInputLoggerForDevice(d, parsed) {
   const MOVE_PERCENT = 0.02
   const AXIS_COOLDOWN_MS = 1000
 
-  // --- DEBUG: axes-by-rid dump + rid sampling (does not affect behavior) ---
+  // --- DEBUG: axes-by-rid dump + rid sampling + packet sampling + axis defs + axis value sampling ---
   const DEBUG_RID = 1
-  let axesByRidDumped = false
 
+  let axesByRidDumped = false
   function dumpAxesByRidOnce() {
     if (!DEBUG_RID) return
     if (axesByRidDumped) return
@@ -1050,10 +1050,8 @@ function startInputLoggerForDevice(d, parsed) {
 
     try {
       const rows = []
-      for (const pair of parsed.axesByReport.entries()) {
-        const rid = pair[0]
-        const list = pair[1] || []
-        const names = list
+      for (const [rid, list] of parsed.axesByReport.entries()) {
+        const names = (list || [])
           .filter(a => a && a.name)
           .map(a => a.name)
           .join(', ')
@@ -1063,10 +1061,10 @@ function startInputLoggerForDevice(d, parsed) {
 
       logs('[AXES BY RID]'.bgCyan, prefix, d.product)
       for (const r of rows) {
-        logs('  rid'.yellow, String(r.rid).cyan, '=>'.yellow, r.axes || '(none)')
+        logs(' rid'.yellow, String(r.rid).cyan, '=>'.yellow, r.axes || '(none)')
       }
     } catch (err) {
-      logs('[AXES BY RID] dump failed'.bgRed, err)
+      logs_error('[AXES BY RID] dump failed'.bgRed, err)
     }
   }
 
@@ -1086,6 +1084,46 @@ function startInputLoggerForDevice(d, parsed) {
   global.dumpRudderPackets = (ms = 2000) => {
     pktSampleUntil = Date.now() + Math.max(250, Number(ms) || 2000)
     logs('[PKT]'.bgMagenta, prefix, 'sampling enabled for'.yellow, (pktSampleUntil - Date.now()) + 'ms')
+  }
+
+  global.dumpAxisDefs = () => {
+    logs('[AXIS DEFS]'.bgCyan, prefix, d.product)
+
+    try {
+      const rows = []
+      for (const [rid, list] of parsed.axesByReport.entries()) {
+        rows.push({ rid, list: list || [] })
+      }
+      rows.sort((a, b) => a.rid - b.rid)
+
+      for (const row of rows) {
+        logs(' rid'.yellow, row.rid, '=>'.yellow)
+        for (const a of row.list) {
+          if (!a) continue
+          logs('  -'.yellow, {
+            name: a.name,
+            usagePage: a.usagePage,
+            usage: a.usage,
+            bitOffset: a.bitOffset,
+            bitSize: a.bitSize,
+            logicalMin: a.logicalMin,
+            logicalMax: a.logicalMax
+          })
+        }
+      }
+    } catch (err) {
+      logs_error('[AXIS DEFS] dump failed'.bgRed, err)
+    }
+  }
+
+  let axisSampleUntil = 0
+  let axisSampleLastAt = 0
+  const AXIS_SAMPLE_MS = 200
+
+  global.sampleAxes = (ms = 2000) => {
+    axisSampleUntil = Date.now() + Math.max(250, Number(ms) || 2000)
+    axisSampleLastAt = 0
+    logs('[AXIS SAMPLE]'.bgMagenta, prefix, 'enabled for'.yellow, (axisSampleUntil - Date.now()) + 'ms')
   }
   // ------------------------------------------------------------------------
 
@@ -1326,6 +1364,27 @@ function startInputLoggerForDevice(d, parsed) {
     const axes = parsed.axesByReport.get(rid) || []
     if (!buttons.length && !axes.length) return
 
+    // DEBUG: sample decoded axis values while enabled (prints x/y/z etc)
+    if (axisSampleUntil && Date.now() < axisSampleUntil) {
+      const now = Date.now()
+      if (now - axisSampleLastAt >= AXIS_SAMPLE_MS) {
+        axisSampleLastAt = now
+
+        const snap = {}
+        for (const a of axes) {
+          if (!a || !a.name) continue
+
+          const rawU = readBitsAsUnsignedLE(payload, a.bitOffset, a.bitSize)
+          let v = rawU
+          if (a.logicalMin < 0) v = toSigned(rawU, a.bitSize)
+
+          snap[a.name] = v
+        }
+
+        logs('[AXIS SAMPLE]'.bgMagenta, prefix, 'rid'.yellow, rid, snap)
+      }
+    }
+
     // Lazily init baseline states
     for (const b of buttons) {
       const k = `${rid}:${b.usage}`
@@ -1518,6 +1577,7 @@ function startInputLoggerForDevice(d, parsed) {
     message: `Input-Detection: ${prefix} listeners attached (data=${device.listenerCount('data')} error=${device.listenerCount('error')})`
   })
 }
+
 
 let init = 1
 let page = 'joyview'
