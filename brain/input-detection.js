@@ -1061,12 +1061,12 @@ function startInputLoggerForDevice(d, parsed) {
       }
       rows.sort((a, b) => a.rid - b.rid)
 
-      console.log('[AXES BY RID]'.bgCyan, prefix, d.product)
+      logs('[AXES BY RID]'.bgCyan, prefix, d.product)
       for (const r of rows) {
-        console.log('  rid'.yellow, String(r.rid).cyan, '=>'.yellow, r.axes || '(none)')
+        logs('  rid'.yellow, String(r.rid).cyan, '=>'.yellow, r.axes || '(none)')
       }
     } catch (err) {
-      console.log('[AXES BY RID] dump failed'.bgRed, err)
+      logs('[AXES BY RID] dump failed'.bgRed, err)
     }
   }
 
@@ -1076,7 +1076,7 @@ function startInputLoggerForDevice(d, parsed) {
 
   global.dumpRudderRid = (ms = 2000) => {
     ridSampleUntil = Date.now() + Math.max(250, Number(ms) || 2000)
-    console.log('[RID]'.bgBlue, prefix, 'sampling enabled for'.yellow, (ridSampleUntil - Date.now()) + 'ms')
+    logs('[RID]'.bgBlue, prefix, 'sampling enabled for'.yellow, (ridSampleUntil - Date.now()) + 'ms')
   }
 
   let pktSampleUntil = 0
@@ -1085,7 +1085,7 @@ function startInputLoggerForDevice(d, parsed) {
 
   global.dumpRudderPackets = (ms = 2000) => {
     pktSampleUntil = Date.now() + Math.max(250, Number(ms) || 2000)
-    console.log('[PKT]'.bgMagenta, prefix, 'sampling enabled for'.yellow, (pktSampleUntil - Date.now()) + 'ms')
+    logs('[PKT]'.bgMagenta, prefix, 'sampling enabled for'.yellow, (pktSampleUntil - Date.now()) + 'ms')
   }
   // ------------------------------------------------------------------------
 
@@ -1297,7 +1297,7 @@ function startInputLoggerForDevice(d, parsed) {
       const now = Date.now()
       if (now - ridLastPrintedAt >= RID_SAMPLE_MS) {
         ridLastPrintedAt = now
-        console.log(
+        logs(
           '[RID]'.bgBlue,
           prefix,
           'rid='.yellow, rid,
@@ -1312,7 +1312,7 @@ function startInputLoggerForDevice(d, parsed) {
       const now = Date.now()
       if (now - pktLastPrintedAt >= PKT_SAMPLE_MS) {
         pktLastPrintedAt = now
-        console.log(
+        logs(
           '[PKT]'.bgMagenta,
           prefix,
           'rid='.yellow, rid,
@@ -1518,8 +1518,6 @@ function startInputLoggerForDevice(d, parsed) {
     message: `Input-Detection: ${prefix} listeners attached (data=${device.listenerCount('data')} error=${device.listenerCount('error')})`
   })
 }
-
-
 
 let init = 1
 let page = 'joyview'
