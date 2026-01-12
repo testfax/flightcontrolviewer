@@ -525,7 +525,7 @@ function plainToInputsMaps(plain) {
   }
 }
 function addToIndexDevices(learned) {
-  const pidvid = pidVidFromHidPath(learned.path)
+  const pidvid = pidVidFromHidPath(learned.path,learned.key)
   if (!pidvid) return
   const storeAll = structuredClone(layoutIndex.store || {})
   const hasNested = storeAll.layoutIndex && typeof storeAll.layoutIndex === 'object'
@@ -554,7 +554,7 @@ function addToIndexDevices(learned) {
   }
 
   data.devices[pidvid] = layoutFile
-
+  
   if (hasNested) {
     layoutIndex.set('layoutIndex', data)
   } else {
@@ -583,8 +583,8 @@ function learnAndPersistDevice(d, dumpText) {
   for (const arr of parsed.buttonsByReport.values()) totalButtons += arr.length
   let totalAxes = 0
   for (const arr of parsed.axesByReport.values()) totalAxes += arr.length
-
-  if (totalButtons === 0 && totalAxes === 0) return null
+  if (totalButtons === 0 && totalAxes === 0 && d.product != "vJoy - Virtual Joystick") return null
+  
 
   const key = deviceKeyFromHidInfo(d)
   const devices = getDevicesStore()
@@ -661,14 +661,20 @@ function findKeybind(key, discoveredKeybinds) {
     return 0
   }
 }
-function pidVidFromHidPath(path) {
-  if (typeof path !== 'string') return null
+function pidVidFromHidPath(path, key) {
+  const fromHidPath = v => {
+    if (typeof v !== 'string') return null
+    const m = v.match(/VID_([0-9A-Fa-f]{4})&PID_([0-9A-Fa-f]{4})/)
+    return m ? `${m[1].toUpperCase()}:${m[2].toUpperCase()}` : null
+  }
 
-  const match = path.match(/VID_([0-9A-Fa-f]{4})&PID_([0-9A-Fa-f]{4})/)
-  if (!match) return null
+  const fromKey = v => {
+    if (typeof v !== 'string') return null
+    const m = v.match(/^([0-9A-Fa-f]{4}):([0-9A-Fa-f]{4})/)
+    return m ? `${m[1].toUpperCase()}:${m[2].toUpperCase()}` : null
+  }
 
-  const [, vid, pid] = match
-  return `${vid.toUpperCase()}:${pid.toUpperCase()}`
+  return fromHidPath(path) || fromKey(key)
 }
 function resolveLayoutsDir(app, path) {
   return path.join(app.getAppPath(), 'layouts')
@@ -689,7 +695,7 @@ function gatherAfterDeviceInputs(data, d) {
   }
 
   const deviceSpecs = {
-    key: pidVidFromHidPath(d.path),
+    key: pidVidFromHidPath(d.path,d.key),
     joyInput: data,
     product: d.product,
     vid: d.vendorId,
@@ -864,8 +870,6 @@ async function main() {
 
   if (page == 'setup') { setupUI(getDevicesStore(), "from_brain-detection") }
 }
-
-
 function initializeUI(data, receiver) {
   if (windowItemsStore.get('currentPage') === 'joyview') {
     let package = {}

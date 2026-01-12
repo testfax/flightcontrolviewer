@@ -181,7 +181,7 @@ function main() {
         win.loadFile(path.join(__dirname, './renderers/joyview/joyview.html'))
 
         win.on("ready-to-show", () => {
-          win.setTitle(`Flight Control Viewer - ${app.getVersion()}`)
+          win.setTitle(`Star Citizen Flight Control Viewer - ${app.getVersion()}`)
           const windowPositionz = windowPosition(win,1)
           win.setPosition(windowPositionz.moveTo[0],windowPositionz.moveTo[1])
           win.setSize(windowPositionz.resizeTo[0],windowPositionz.resizeTo[1])

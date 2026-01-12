@@ -21,7 +21,7 @@ const util = {
             const dir = resolveLayoutsDir(app, path)
             const indexPath = path.join(dir, 'index.json')
             if (!fs.existsSync(indexPath)) {
-                logs_error("no layout/index.json file")
+                logs_error('[APP]'.bgRed, "no layout/index.json file")
             }
             const indexJson = JSON.parse(fs.readFileSync(indexPath, 'utf8'))
             layoutIndex.set(indexJson)
@@ -162,15 +162,15 @@ const util = {
         autoUpdater.logger = require('electron-log')
 
         autoUpdater.on('checking-for-update', () => {
-            win.setTitle(`Flight Control Viewer - ${app.getVersion()} Checking for updates...`)
+            win.setTitle(`Star Citizen Flight Control Viewer - ${app.getVersion()} Checking for updates...`)
         })
 
         autoUpdater.on('update-available', info => {
-            win.setTitle(`Flight Control Viewer - ${app.getVersion()} - ${info.version} Update available, downloading...`)
+            win.setTitle(`Star Citizen Flight Control Viewer - ${app.getVersion()} - ${info.version} Update available, downloading...`)
         })
 
         autoUpdater.on('update-not-available', () => {
-            win.setTitle(`Flight Control Viewer - ${app.getVersion()} up to date...`)
+            win.setTitle(`Star Citizen Flight Control Viewer - ${app.getVersion()} up to date...`)
         })
 
         // autoUpdater.on('download-progress', p => {
@@ -183,12 +183,12 @@ const util = {
         autoUpdater.on('download-progress', (progressObj) => {
             const thisPercent = progressObj.percent / 100
             const formattedNumber = (thisPercent).toLocaleString(undefined, { style: 'percent', minimumFractionDigits:1});
-            win.setTitle(`Flight Control Viewer - ${JSON.stringify(app.getVersion())} Downloading New Update ${formattedNumber}`)
+            win.setTitle(`Star Citizen Flight Control Viewer - ${JSON.stringify(app.getVersion())} Downloading New Update ${formattedNumber}`)
         })
 
         autoUpdater.on('error', err => {
             logs_error('[AU] error', err && err.stack ? err.stack : err)
-            win.setTitle(`Flight Control Viewer - ${app.getVersion()} Update error (see logs)`)
+            win.setTitle(`Star Citizen Flight Control Viewer - ${app.getVersion()} Update error (see logs)`)
         })
         autoUpdater.on('update-downloaded', async () => {
             const result = await dialog.showMessageBox(win, {
@@ -219,8 +219,8 @@ const util = {
         if (!result.hasOwnProperty('clientSize')) { 
             // return {moveTo:[700,100], resizeTo:[600,600]}
             saveWindowPosition()
-            return {moveTo:[-876,13], resizeTo:[800,1000]}
-            // return {moveTo:[639,18], resizeTo:[800,1000]}
+            // return {moveTo:[-876,13], resizeTo:[800,1000]}
+            return {moveTo:[639,18], resizeTo:[800,1000]}
         }
         if (init) {
             //If init is truthy, then return the result of the file contents and send back what you need.

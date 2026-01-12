@@ -1,9 +1,9 @@
 {
   "schema": 2,
   "device": {
-    "grip": "VJOY",
+    "grip": "vJoy - Virtual Joystick",
     "hand": "1",
-    "product": "VJOY",
+    "product": "vJoy - Virtual Joystick",
     "vid": "0",
     "pid": "0"
   },

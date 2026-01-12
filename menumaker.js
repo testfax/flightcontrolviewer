@@ -16,7 +16,6 @@ const links = {
     const filesToDelete = [
       'actionmapsJSON.json',
       'deviceInfo.json',
-      'electronWindowIds.json',
       'viewerLogs.json',
       'layoutIndex.json'
     ]
